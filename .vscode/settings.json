@@ -1,0 +1,140 @@
+{
+  "workbench.colorTheme": "Default Dark+",
+  "workbench.colorCustomizations": {
+    "[Default Dark+]": {
+      "activityBar.activeBackground": "#a1cdff",
+      "titleBar.activeBackground": "#010168",
+      "titleBar.activeForeground": "#ffffff",
+      "statusBar.background": "#242424",
+      "statusBar.foreground": "#ffffff",
+      "statusBar.noFolderBackground": "#242424"
+    }
+  },
+  "markdown.previewFrontMatter": "show",
+  "todohighlight.isEnable": true,
+  "todohighlight.isCaseSensitive": true,
+  "todohighlight.keywords": [
+    {
+      // あとで追加、修正するべき機能がある。
+      "text": "TODO:",
+      "color": "#fff",
+      "backgroundColor": "#4a9eff",
+      "overviewRulerColor": "#4a9eff",
+      "border": "1px solid #2e7bd6",
+      "borderRadius": "3px"
+    },
+    {
+      // 既知の不具合があるコード。修正が必要。
+      "text": "FIXME:",
+      "color": "#fff",
+      "backgroundColor": "#ff6b9d",
+      "overviewRulerColor": "#ff6b9d",
+      "border": "1px solid #e63950",
+      "borderRadius": "3px"
+    },
+    {
+      // あまりきれいじゃないコード。リファクタリング要。
+      "text": "HACK:",
+      "color": "#fff",
+      "backgroundColor": "#ffa500",
+      "overviewRulerColor": "#ffa500",
+      "border": "1px solid #ff8c00",
+      "borderRadius": "3px"
+    },
+    {
+      // 危険！動くけどなぜうごくかわからない。
+      "text": "XXX:",
+      "color": "#fff",
+      "backgroundColor": "#ff4444",
+      "overviewRulerColor": "#ff4444",
+      "border": "1px solid #cc0000",
+      "borderRadius": "3px"
+    },
+    {
+      // 意図した通りに動くか、見直す必要がある。
+      "text": "REVIEW:",
+      "color": "#fff",
+      "backgroundColor": "#9b59b6",
+      "overviewRulerColor": "#9b59b6",
+      "border": "1px solid #7d3c98",
+      "borderRadius": "3px"
+    },
+    {
+      // 無駄が多く、ボトルネックになっている。
+      "text": "OPTIMIZE:",
+      "color": "#fff",
+      "backgroundColor": "#16a085",
+      "overviewRulerColor": "#16a085",
+      "border": "1px solid #138d75",
+      "borderRadius": "3px"
+    },
+    {
+      // コードをどのように変更したか
+      "text": "CHANGED:",
+      "color": "#fff",
+      "backgroundColor": "#3498db",
+      "overviewRulerColor": "#3498db",
+      "border": "1px solid #2980b9",
+      "borderRadius": "3px"
+    },
+    {
+      "text": "INFO:",
+      "color": "#2c3e50",
+      "backgroundColor": "#ecf0f1",
+      "overviewRulerColor": "#95a5a6",
+      "border": "1px solid #bdc3c7",
+      "borderRadius": "3px"
+    },
+    {
+      "text": "DEBUG:",
+      "color": "#fff",
+      "backgroundColor": "#7f8c8d",
+      "overviewRulerColor": "#7f8c8d",
+      "border": "1px solid #5d6d7e",
+      "borderRadius": "3px"
+    },
+    {
+      "text": "WARNING:",
+      "color": "#fff",
+      "backgroundColor": "#f39c12",
+      "overviewRulerColor": "#f39c12",
+      "border": "1px solid #d68910",
+      "borderRadius": "3px"
+    }
+  ],
+  // "todohighlight.keywordsPattern": "TODO:|FIXME:|\\(([^)]+)\\)", //highlight `TODO:`,`FIXME:` or content between parentheses
+  "todohighlight.defaultStyle": {
+    // "color": "red",
+    // "backgroundColor": "#ffab00",
+    // "overviewRulerColor": "#ffab00",
+    // "cursor": "pointer",
+    // "border": "1px solid #eee",
+    // "borderRadius": "2px",
+    // "isWholeLine": true,
+    //other styling properties goes here ...
+  },
+  "todohighlight.include": [
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.html",
+    "**/*.php",
+    "**/*.css",
+    "**/*.scss"
+  ],
+  "todohighlight.exclude": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.vscode/**",
+    "**/.github/**",
+    "**/_output/**",
+    "**/*.min.*",
+    "**/*.map",
+    "**/.next/**"
+  ],
+  "todohighlight.maxFilesForSearch": 5120,
+  "todohighlight.toggleURI": false
+}

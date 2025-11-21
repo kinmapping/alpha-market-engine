@@ -1,0 +1,23 @@
+{
+  "unwantedRecommendations": [],
+  "recommendations": [
+    "openai.chatgpt",
+    // markdown
+    "mermaidchart.vscode-mermaid-chart",
+    "bierner.markdown-mermaid",
+    "bierner.github-markdown-preview",
+    "bierner.markdown-checkbox",
+    "bierner.markdown-emoji",
+    "bierner.markdown-footnotes",
+    "bierner.markdown-preview-github-styles",
+    "bpruitt-goddard.mermaid-markdown-syntax-highlighting",
+    "samuelcolvin.jinjahtml",
+    "shd101wyy.markdown-preview-enhanced",
+    // python
+    "anysphere.cursorpyright",
+    "formulahendry.code-runner",
+    "ms-python.debugpy",
+    "ms-python.vscode-pylance",
+    "spmeesseman.vscode-taskexplorer"
+  ]
+}
