@@ -1,0 +1,41 @@
+{
+  "name": "ws-collector-node",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "type-check": "tsc --noEmit",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.3.2",
+    "tsx": "^4.7.3",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^24.0.0",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.0",
+    "typescript": "^5.4.5"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "biome check --write",
+      "biome format --write"
+    ],
+    "src/**/*.{json,md}": [
+      "biome format --write"
+    ]
+  },
+  "overrides": {
+    "glob": ">=11.1.0"
+  }
+}
