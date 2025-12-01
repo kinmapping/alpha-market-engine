@@ -1,0 +1,130 @@
+version: "3.9"
+
+name: alpha-market-engine
+
+services:
+  # 1) WebSocketで板/約定/ティッカーを常時取得して配信・保存する
+  ws-collector-node:
+    build:
+      context: ./services/ws-collector-node
+      dockerfile: Dockerfile
+    container_name: ws-collector-node
+    restart: unless-stopped
+    env_file:
+      - ./services/ws-collector-node/env.example
+    environment:
+      # 必須環境変数（env_file またはホスト環境変数から取得）
+      # 未設定の場合は main.ts の requireEnv() でエラーとなる
+      EXCHANGE_NAME: ${EXCHANGE_NAME}
+      WS_PUBLIC_URL: ${WS_PUBLIC_URL}
+      SYMBOLS: ${SYMBOLS}
+      REDIS_URL: ${REDIS_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+    #   - db
+      - redis
+    networks:
+      - bot-net
+    # volumes:
+    #   - ./services/ws-collector:/app
+    # command: ["python", "-m", "ws_collector.main"]
+
+  # 2) RESTで残高/注文照会/過去OHLCVなど
+  # rest-client:
+  #   build:
+  #     context: .
+  #     dockerfile: ./services/rest-client/Dockerfile
+  #   container_name: rest-client
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     EXCHANGE_NAME: ${EXCHANGE_NAME:-gmo}
+  #     REST_BASE_URL: ${REST_BASE_URL:-}
+  #     API_KEY: ${API_KEY:-}
+  #     API_SECRET: ${API_SECRET:-}
+  #     DATABASE_URL: postgresql://bot:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  #     LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  #   depends_on:
+  #     - db
+  #   networks:
+  #     - bot-net
+  #   volumes:
+  #     - ./services/rest-client:/app
+  #   command: ["python", "-m", "rest_client.main"]
+
+  # 3) Redis/DBからデータ購読→戦略(シグナル)生成
+  # strategy-engine:
+  #   build:
+  #     context: .
+  #     dockerfile: ./services/strategy-engine/Dockerfile
+  #   container_name: strategy-engine
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     SYMBOLS: ${SYMBOLS:-BTC_JPY,ETH_JPY}
+  #     REDIS_URL: redis://redis:6379/0
+  #     DATABASE_URL: postgresql://bot:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  #     STRATEGY_NAME: ${STRATEGY_NAME:-sample_breakout}
+  #     LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  #   depends_on:
+  #     - redis
+  #     - db
+  #   networks:
+  #     - bot-net
+  #   volumes:
+  #     - ./services/strategy-engine:/app
+  #   command: ["python", "-m", "strategy_engine.main"]
+
+  # 4) シグナル購読→リスク管理→注文発行→約定管理
+  # execution-engine:
+  #   build:
+  #     context: .
+  #     dockerfile: ./services/execution-engine/Dockerfile
+  #   container_name: execution-engine
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     EXCHANGE_NAME: ${EXCHANGE_NAME:-gmo}
+  #     REST_BASE_URL: ${REST_BASE_URL:-}
+  #     API_KEY: ${API_KEY:-}
+  #     API_SECRET: ${API_SECRET:-}
+  #     REDIS_URL: redis://redis:6379/0
+  #     DATABASE_URL: postgresql://bot:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  #     MAX_POSITION_SIZE: ${MAX_POSITION_SIZE:-0.05}   # BTC等の上限
+  #     MAX_DRAWDOWN_PCT: ${MAX_DRAWDOWN_PCT:-5}       # 連敗停止など
+  #     LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  #     REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  #   depends_on:
+  #     - redis
+    # networks:
+    #   - bot-net
+
+  # 6) 低遅延メッセージング/キュー
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - bot-net
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  # 以下のサービスは今回の最小構成では不要なためコメントアウト
+  # rest-client:
+  # strategy-engine:
+  # execution-engine:
+  # db:
+
+networks:
+  bot-net:
+    driver: bridge
+
+volumes:
+  # db-data:
+  redis-data:
