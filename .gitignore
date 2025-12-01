@@ -1,0 +1,28 @@
+# Node / TypeScript
+node_modules/
+dist/
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Python / virtual env
+__pycache__/
+*.pyc
+.venv/
+
+# Environment
+.env
+env/
+
+# Docker / volumes
+db-data/
+redis-data/
+
+# IDE / misc
+.DS_Store
+.idea/
+.vscode/
+
+# Generated docs
+docs/build/
+

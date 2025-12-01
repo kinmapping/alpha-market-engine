@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# ws-collector-node の TypeScript ファイルが変更された場合のみチェック
+if git diff --cached --name-only | grep -q 'services/ws-collector-node/.*\.ts$'; then
+  cd services/ws-collector-node || exit 1
+  
+  # lint-staged を実行（変更されたファイルのみをチェック・自動修正）
+  npx lint-staged
+  
+  # TypeScript の型チェック（プロジェクト全体）
+  # エラーがある場合はコミットをブロック
+  npm run type-check || exit 1
+fi
