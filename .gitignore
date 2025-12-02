@@ -21,8 +21,10 @@ redis-data/
 # IDE / misc
 .DS_Store
 .idea/
-.vscode/
 
 # Generated docs
 docs/build/
 
+
+csvs/
+.husky/
