@@ -1,0 +1,91 @@
+version: 2
+updates:
+  # Node.js パッケージの自動更新（ws-collector-node）
+  - package-ecosystem: "npm"
+    directory: "/services/ws-collector-node"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00" # UTC 9:00 = JST 18:00
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "automated"
+      - "npm"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # セマンティックバージョニングに基づく更新
+    versioning-strategy: increase
+    # メジャーバージョン更新は無視（手動管理）
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    # グループ化設定
+    groups:
+      # 開発依存関係はまとめて更新
+      dev-dependencies:
+        patterns:
+          - "@biomejs/biome"
+          - "@types/*"
+          - "typescript"
+          - "vitest"
+          - "husky"
+          - "lint-staged"
+        update-types:
+          - "minor"
+          - "patch"
+      # 本番依存関係は個別に更新（慎重に）
+      production-dependencies:
+        patterns:
+          - "dotenv"
+          - "ioredis"
+          - "tsx"
+          - "winston"
+        update-types:
+          - "minor"
+          - "patch"
+    # セキュリティ更新は自動マージ（CI 通過時）
+    # 注意: GitHub のリポジトリ設定で "Allow auto-merge" を有効化する必要があります
+
+  # Python パッケージの自動更新（将来の strategy-engine）
+  # 注意: Python サービス追加時にコメントを外して有効化
+  # - package-ecosystem: "pip"
+  #   directory: "/services/strategy-engine"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "monday"
+  #     time: "09:00"
+  #   open-pull-requests-limit: 10
+  #   labels:
+  #     - "dependencies"
+  #     - "automated"
+  #     - "python"
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+  #   versioning-strategy: increase
+  #   ignore:
+  #     - dependency-name: "*"
+  #       update-types: ["version-update:semver-major"]
+
+  # Python パッケージの自動更新（将来の execution-engine）
+  # 注意: Python サービス追加時にコメントを外して有効化
+  # - package-ecosystem: "pip"
+  #   directory: "/services/execution-engine"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "monday"
+  #     time: "09:00"
+  #   open-pull-requests-limit: 10
+  #   labels:
+  #     - "dependencies"
+  #     - "automated"
+  #     - "python"
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+  #   versioning-strategy: increase
+  #   ignore:
+  #     - dependency-name: "*"
+  #       update-types: ["version-update:semver-major"]
