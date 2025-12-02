@@ -6,6 +6,20 @@ ws-collector-node の動作確認を自動化するテストスイートです�
 
 ## テストの種類
 
+### 単体テスト (`tests/unit/`)
+
+個別のコンポーネントを独立してテストします。モックを使用して外部依存を排除します。
+
+- **infrastructure/BackoffStrategy.test.ts**: 指数バックオフ戦略のテスト
+  - 指数関数的な遅延計算
+  - MAX_DELAY の上限チェック
+  - reset() の動作確認
+
+- **application/MessageHandler.test.ts**: メッセージハンドラーのテスト
+  - 正常系: パーサー→パブリッシャーのフロー
+  - エッジケース: パーサーが null を返す場合
+  - エラーハンドリング: パブリッシャーがエラーを投げる場合
+
 ### 統合テスト (`tests/integration/`)
 
 実際の Redis に接続して、データ配信が正常に動作することを確認します。
@@ -45,6 +59,12 @@ ws-collector-node の動作確認を自動化するテストスイートです�
 npm test
 ```
 
+### 単体テストのみ実行
+
+```bash
+npm run test:unit
+```
+
 ### 統合テストのみ実行
 
 ```bash
@@ -59,7 +79,7 @@ npm run test:watch
 
 ## テストの確認項目
 
-### レベル1: 基本動作確認
+### レベル1: 基本動作確認（統合テスト）
 
 以下の項目が自動的に確認されます：
 
@@ -69,11 +89,52 @@ npm run test:watch
 - ✅ タイムスタンプが適切に設定されている
 - ✅ メッセージ数が増加している
 
-### メッセージ正規化の確認
+### メッセージ正規化の確認（統合テスト）
 
 - ✅ GMO API の ticker/orderbook/trade メッセージが正規化される
 - ✅ エラーメッセージが適切に処理される
 - ✅ 不正な形式のメッセージが適切に処理される
+
+### ユニットテスト (`tests/unit/`)
+
+#### Infrastructure層
+
+- ✅ **BackoffStrategy.test.ts** (11 tests)
+  - 指数バックオフの計算ロジック
+  - MAX_DELAY の上限チェック
+  - reset() の動作確認
+
+- ✅ **GmoMessageParser.test.ts** (21 tests)
+  - 正常系: ticker/orderbook/trade メッセージの正規化
+  - エッジケース: 不正なタイムスタンプ、不正なデータ型、部分的なデータ欠損
+  - エラーメッセージの処理
+  - 未知のチャンネル、パースエラーの処理
+  - 境界値テスト（大きな数値、負の数値、ゼロ値）
+
+- ✅ **ReconnectManager.test.ts** (16 tests)
+  - start() の動作確認
+  - scheduleReconnect() の動作確認
+  - stop() の動作確認
+  - バックオフ戦略の適用
+  - エラーハンドリング
+  - 統合的な動作確認
+
+- ✅ **RedisPublisher.test.ts** (17 tests)
+  - publish() の動作確認（ticker/orderbook/trade）
+  - データの JSON シリアライズ確認
+  - Redis接続エラーのハンドリング
+  - Stream名の取得ロジック
+  - close() の動作確認
+  - 複数のイベント配信
+  - エッジケース: 特殊なデータ形式
+
+#### Application層
+
+- ✅ **MessageHandler.test.ts** (9 tests)
+  - 正常フロー（parser → publisher）
+  - エッジケース（parser が null を返す場合）
+  - エラーハンドリング（publisher がエラーを投げる場合）
+  - 複数メッセージの処理
 
 ## CI/CD での実行
 
