@@ -138,11 +138,22 @@
   "todohighlight.maxFilesForSearch": 5120,
   "todohighlight.toggleURI": false,
   "cSpell.words": [
+    "appendonly",
+    "biomejs",
+    "dotenv",
+    "ioredis",
     "klines",
     "Losscut",
-    "orderbooks",
     "ohlcv",
+    "orderbooks",
+    "pycache",
+    "trixie",
+    "venv",
+    "vitest",
     "websocket",
-    "trixie"
+    "Xadd",
+    "xlen",
+    "xread",
+    "xrevrange"
   ]
 }
