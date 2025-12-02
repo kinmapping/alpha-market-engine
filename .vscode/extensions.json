@@ -18,6 +18,8 @@
     "formulahendry.code-runner",
     "ms-python.debugpy",
     "ms-python.vscode-pylance",
-    "spmeesseman.vscode-taskexplorer"
+    "spmeesseman.vscode-taskexplorer",
+    "yzhang.markdown-all-in-one",
+    "streetsidesoftware.code-spell-checker"
   ]
 }
