@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# _/husky.sh は husky が自動生成するファイルで、実行時に存在します。これを読み込むことで husky の機能を使用できます。
+# `shellcheck` は静的解析のため、このファイルを検出できません。
+# shellcheck source=/dev/null
+. "$(dirname -- "$0")/_/husky.sh"
+
+# ws-collector-node の TypeScript ファイルが変更された場合のみチェック
+if git diff --cached --name-only | grep -q 'services/ws-collector-node/.*\.ts$'; then
+  cd services/ws-collector-node || exit 1
+
+  # lint-staged を実行（変更されたファイルのみをチェック・自動修正）
+  npx lint-staged
+
+  # TypeScript の型チェック（プロジェクト全体）
+  # エラーがある場合はコミットをブロック
+  npm run type-check || exit 1
+fi
