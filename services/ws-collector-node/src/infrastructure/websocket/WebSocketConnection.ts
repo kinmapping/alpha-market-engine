@@ -60,19 +60,27 @@ export class StandardWebSocketConnection implements WebSocketConnection {
   constructor(private readonly socket: WebSocket) {
     // 標準の WebSocket イベントを内部で管理
     this.socket.addEventListener('open', () => {
-      this.openCallbacks.forEach((cb) => cb());
+      for (const cb of this.openCallbacks) {
+        cb();
+      }
     });
 
     this.socket.addEventListener('message', (event) => {
-      this.messageCallbacks.forEach((cb) => cb(event.data));
+      for (const cb of this.messageCallbacks) {
+        cb(event.data);
+      }
     });
 
     this.socket.addEventListener('close', () => {
-      this.closeCallbacks.forEach((cb) => cb());
+      for (const cb of this.closeCallbacks) {
+        cb();
+      }
     });
 
     this.socket.addEventListener('error', (event) => {
-      this.errorCallbacks.forEach((cb) => cb(event));
+      for (const cb of this.errorCallbacks) {
+        cb(event);
+      }
     });
   }
 

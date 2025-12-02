@@ -1,7 +1,7 @@
-import type { NormalizedEvent } from '@/domain/types';
-import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';
 import Redis from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { NormalizedEvent } from '@/domain/types';
+import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';
 
 /**
  * 統合テスト: Redis Stream へのデータ配信確認

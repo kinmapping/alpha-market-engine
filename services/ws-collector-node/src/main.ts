@@ -60,7 +60,9 @@ async function bootstrap(): Promise<void> {
   const shutdown = async () => {
     console.log('Shutting down ws-collector-node...');
     // SIGINT/SIGTERM で全アダプタを切断し Redis クライアントも閉じる。
-    adapters.forEach((adapter) => adapter.disconnect());
+    for (const adapter of adapters) {
+      adapter.disconnect();
+    }
     await publisher.close();
     process.exit(0);
   };

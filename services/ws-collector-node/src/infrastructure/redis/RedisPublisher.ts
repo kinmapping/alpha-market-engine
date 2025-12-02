@@ -1,6 +1,6 @@
+import Redis from 'ioredis';
 import type { EventPublisher } from '@/application/handlers/MessageHandler';
 import type { NormalizedEvent } from '@/domain/types';
-import Redis from 'ioredis';
 
 /**
  * インフラ層: Redis Stream への書き込み実装
