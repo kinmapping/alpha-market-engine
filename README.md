@@ -12,81 +12,28 @@
 - ✅ AI/機械学習モデルの組み込みを想定した戦略レイヤ
 - ✅ docker-compose で即起動できるテンプレート
 
-## Architecture (High Level)
-
-```mermaid
-graph TB
-    Bot["bot<br/>(24h run)<br/>WS購読 / ロジック / REST発注 / 約定処理 / ログ"]
-    FastAPI["FastAPI<br/>bot 状態 / ログ参照 / 将来パラメータ制御"]
-    PostgreSQL["PostgreSQL<br/>トレード・状態ログ"]
-
-    Bot <-->|HTTP| FastAPI
-    Bot --> PostgreSQL
-    FastAPI --> PostgreSQL
-```
-
-## Repository Structure
-
-```
-
-alpha-market-engine/
-    docker-compose.yml
-    .env
-    bot/
-        Dockerfile
-        main.py
-        exchange.py        # GMOコイン対応版
-        strategy.py
-        logger.py
-        requirements.txt
-    api/
-        Dockerfile
-        app.py
-        routes.py
-        requirements.txt
-    shared/
-        config.py
-        db.py
-    docs/
-        要件.md
-        アーキテクチャ.md
-        実装ガイド.md
-        bot設計.md
-        FastAPI設計.md
-
-```
-
 ## Setup
 
-### 1. Create `.env`
+1. **環境変数を設定**
 
-```env
-EXCHANGE=gmocoin
-SYMBOL=BTC_JPY
-
-API_KEY=your_api_key
-API_SECRET=your_api_secret
-
-TRADE_SIZE=0.001
-LOG_LEVEL=INFO
-```
+   `env.example` をもとに環境変数を設定する
 
 **注意:** API キーに出金権限は付けない推奨。
 
-### 2. Build & Run
+1. **Build & Run**
 
-```bash
-docker-compose up --build
-```
+    ```bash
+    docker-compose up --build
+    ```
 
-### 3. Health Check
+1. **Health Check**
 
-* FastAPI: `http://localhost:8000/health`
-* bot logs:
+   * FastAPI: `http://localhost:8000/health`
+   * bot logs:
 
-  ```bash
-  docker logs -f trade_bot
-  ```
+    ```bash
+    docker logs -f trade_bot
+    ```
 
 ## How It Works (Minimal Loop)
 
@@ -96,22 +43,7 @@ docker-compose up --build
 4. 約定/板/価格イベントを監視し、ログ保存
 5. FastAPI で bot 状態やログを参照
 
-## Strategy
 
-`bot/strategy.py` は差し替え前提のレイヤ。
-最初は単純ルールで動作確認し、後からAIへ置き換えるのが推奨。
-
-### Example (Pseudo)
-
-```python
-def decide_signal(tick):
-    # TODO: replace with ML/AI model
-    if some_condition:
-        return "BUY"
-    if some_condition:
-        return "SELL"
-    return None
-```
 
 ## Roadmap
 
