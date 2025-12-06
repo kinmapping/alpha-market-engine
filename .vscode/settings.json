@@ -141,6 +141,8 @@
     "appendonly",
     "biomejs",
     "dotenv",
+    "exitcode",
+    "huskyrc",
     "ioredis",
     "klines",
     "Losscut",
