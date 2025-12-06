@@ -14,4 +14,8 @@ if git diff --cached --name-only | grep -q 'services/ws-collector-node/.*\.ts$';
   # TypeScript の型チェック（プロジェクト全体）
   # エラーがある場合はコミットをブロック
   npm run type-check || exit 1
+
+  # 単体テストを実行（統合テストは除外）
+  # 外部依存（Redis）が不要で、実行が速い
+  npm run test:unit || exit 1
 fi
