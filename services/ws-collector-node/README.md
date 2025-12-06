@@ -229,9 +229,55 @@ Error: connect ECONNREFUSED 127.0.0.1:6379
 - `vitest.config.ts` の `testTimeout` を増やす（デフォルト: 30秒）
 - Redis の接続を確認
 
+## リンター設定
+
+### Biome と ESLint の併用
+
+このプロジェクトでは、**Biome** と **ESLint** を併用しています：
+
+- **Biome**: フォーマット、スタイル、基本的なリンタールールを担当
+- **ESLint**: 複雑度関連のルール（`max-depth`, `complexity` など）を担当
+
+### 実行方法
+
+```bash
+# Biome と ESLint の両方を実行
+npm run lint
+
+# Biome のみ実行
+npm run lint:biome
+
+# ESLint のみ実行
+npm run lint:eslint
+
+# 自動修正（Biome と ESLint の両方）
+npm run lint:fix
+```
+
+### ESLint の複雑度ルール
+
+ESLint では以下の複雑度ルールが設定されています：
+
+- **`max-depth`**: ネストの深さは最大4階層（エラー）
+- **`complexity`**: 循環的複雑度は最大15（警告）
+- **`max-lines-per-function`**: 関数の行数は最大100行（警告、テストファイルは400行）
+- **`max-params`**: パラメータ数は最大5個（警告）
+
+テストファイル（`tests/**/*.ts`）は、複雑なテストケースを含むことが多いため、上限が緩和されています。
+
+### Biome のコマンドによる設定解釈の違い
+
+Biome 2.3.8 では、コマンドによって設定ファイルの解釈が異なる場合があります：
+
+- **`biome check .`** (プロジェクト全体): `assist.actions.source.organizeImports` と `overrides[].includes`（複数形）を使用
+- **`biome lint <path>`** (個別ファイル): `organizeImports`（ルートレベル）と `overrides[].include`（単数形）を要求
+
+**推奨**: `npm run lint`（`biome check . && eslint .`）を使用してください。
+
 ## 参考資料
 
 - [Vitest ドキュメント](https://vitest.dev/)
 - [Redis Streams ドキュメント](https://redis.io/docs/data-types/streams/)
-- [ws-collector-node 設計](../../docs/architecture/02_ws_collector_node.md)
+- [ws-collector-node 設計](../docs/architecture/02_ws_collector_node.md)
+- [Biome ドキュメント](https://biomejs.dev/)
 

@@ -182,17 +182,13 @@ describe('GmoAdapter', () => {
       await connectPromise;
 
       // onClose コールバックを取得して実行
-      const onCloseCallback = vi.mocked(mockConnection.onClose).mock.calls[0]?.[0] as
-        | (() => void)
-        | undefined;
+      const onCloseCallback = vi.mocked(mockConnection.onClose).mock.calls[0]?.[0] as (() => void) | undefined;
       if (onCloseCallback) {
         onCloseCallback();
       }
 
       expect(mockScheduleReconnect).toHaveBeenCalled();
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoAdapter] socket closed')
-      );
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] socket closed'));
     });
 
     it('エラーが発生した場合、ログに記録する', async () => {
@@ -209,10 +205,7 @@ describe('GmoAdapter', () => {
         onErrorCallback(errorEvent);
       }
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoAdapter] socket error'),
-        errorEvent
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] socket error'), errorEvent);
     });
   });
 
@@ -310,12 +303,8 @@ describe('GmoAdapter', () => {
         await onMessageCallback(JSON.stringify(errorMessage));
       }
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoAdapter] API error: ERR-5003')
-      );
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoAdapter] Rate limit error detected')
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] API error: ERR-5003'));
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] Rate limit error detected'));
       expect(mockMessageHandler.handle).not.toHaveBeenCalled();
     });
 

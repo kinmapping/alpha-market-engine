@@ -182,18 +182,12 @@ describe('GmoWebSocketClient', () => {
       await subscribePromise;
 
       expect(mockSend).toHaveBeenCalledTimes(3);
-      expect(mockSend).toHaveBeenNthCalledWith(
-        1,
-        JSON.stringify({ command: 'subscribe', channel: 'ticker', symbol })
-      );
+      expect(mockSend).toHaveBeenNthCalledWith(1, JSON.stringify({ command: 'subscribe', channel: 'ticker', symbol }));
       expect(mockSend).toHaveBeenNthCalledWith(
         2,
         JSON.stringify({ command: 'subscribe', channel: 'orderbooks', symbol })
       );
-      expect(mockSend).toHaveBeenNthCalledWith(
-        3,
-        JSON.stringify({ command: 'subscribe', channel: 'trades', symbol })
-      );
+      expect(mockSend).toHaveBeenNthCalledWith(3, JSON.stringify({ command: 'subscribe', channel: 'trades', symbol }));
     });
 
     it('レート制限対策として、各購読リクエストの間に1秒の間隔を設ける', async () => {
@@ -239,18 +233,9 @@ describe('GmoWebSocketClient', () => {
       await subscribePromise;
 
       expect(console.log).toHaveBeenCalledTimes(3);
-      expect(console.log).toHaveBeenNthCalledWith(
-        1,
-        '[GmoWebSocketClient] subscribed to ticker for BTC_JPY'
-      );
-      expect(console.log).toHaveBeenNthCalledWith(
-        2,
-        '[GmoWebSocketClient] subscribed to orderbooks for BTC_JPY'
-      );
-      expect(console.log).toHaveBeenNthCalledWith(
-        3,
-        '[GmoWebSocketClient] subscribed to trades for BTC_JPY'
-      );
+      expect(console.log).toHaveBeenNthCalledWith(1, '[GmoWebSocketClient] subscribed to ticker for BTC_JPY');
+      expect(console.log).toHaveBeenNthCalledWith(2, '[GmoWebSocketClient] subscribed to orderbooks for BTC_JPY');
+      expect(console.log).toHaveBeenNthCalledWith(3, '[GmoWebSocketClient] subscribed to trades for BTC_JPY');
     });
   });
 
@@ -284,10 +269,7 @@ describe('GmoWebSocketClient', () => {
 
       const jsonString = JSON.stringify(message);
       const buffer = Buffer.from(jsonString, 'utf-8');
-      const arrayBuffer = buffer.buffer.slice(
-        buffer.byteOffset,
-        buffer.byteOffset + buffer.byteLength
-      );
+      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 
       const parsed = client.parseMessage(arrayBuffer);
 
@@ -308,10 +290,7 @@ describe('GmoWebSocketClient', () => {
       const jsonString = JSON.stringify(message);
       const buffer = Buffer.from(jsonString, 'utf-8');
       // Blob を ArrayBuffer として扱う（実装では Blob を ArrayBuffer に変換している）
-      const blob = buffer.buffer.slice(
-        buffer.byteOffset,
-        buffer.byteOffset + buffer.byteLength
-      ) as unknown as Blob;
+      const blob = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as unknown as Blob;
 
       const parsed = client.parseMessage(blob);
 
@@ -350,8 +329,7 @@ describe('GmoWebSocketClient', () => {
       };
 
       // 数値を直接渡す（String() で変換される）
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const parsed = client.parseMessage(JSON.stringify(message) as any);
+      const parsed = client.parseMessage(JSON.stringify(message) as string);
 
       expect(parsed).toEqual(message);
     });

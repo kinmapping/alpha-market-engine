@@ -1,7 +1,4 @@
-import {
-  StandardWebSocketConnection,
-  type WebSocketConnection,
-} from '@/infrastructure/websocket/WebSocketConnection';
+import { StandardWebSocketConnection, type WebSocketConnection } from '@/infrastructure/websocket/WebSocketConnection';
 import type { GmoCommand } from './messages/GmoCommand';
 import type { GmoRawMessage } from './messages/GmoRawMessage';
 

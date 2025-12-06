@@ -17,10 +17,7 @@ export class GmoMessageParser implements MessageParser {
     try {
       const message = rawMessage as GmoRawMessage;
       if (!message?.channel) {
-        console.warn(
-          '[GmoMessageParser] message missing channel field:',
-          JSON.stringify(rawMessage)
-        );
+        console.warn('[GmoMessageParser] message missing channel field:', JSON.stringify(rawMessage));
         return null;
       }
 

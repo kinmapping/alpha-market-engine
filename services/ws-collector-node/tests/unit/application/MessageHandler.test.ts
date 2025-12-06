@@ -147,12 +147,8 @@ describe('DefaultMessageHandler', () => {
         data: {},
       };
 
-      vi.mocked(mockParser.parse)
-        .mockReturnValueOnce(normalizedEvent1)
-        .mockReturnValueOnce(normalizedEvent2);
-      vi.mocked(mockPublisher.publish)
-        .mockRejectedValueOnce(new Error('First error'))
-        .mockResolvedValueOnce(undefined);
+      vi.mocked(mockParser.parse).mockReturnValueOnce(normalizedEvent1).mockReturnValueOnce(normalizedEvent2);
+      vi.mocked(mockPublisher.publish).mockRejectedValueOnce(new Error('First error')).mockResolvedValueOnce(undefined);
 
       // 1回目はエラー
       await expect(handler.handle(rawMessage1)).rejects.toThrow();
@@ -197,9 +193,7 @@ describe('DefaultMessageHandler', () => {
         data: {},
       };
 
-      vi.mocked(mockParser.parse)
-        .mockReturnValueOnce(normalizedEvent1)
-        .mockReturnValueOnce(normalizedEvent2);
+      vi.mocked(mockParser.parse).mockReturnValueOnce(normalizedEvent1).mockReturnValueOnce(normalizedEvent2);
       vi.mocked(mockPublisher.publish).mockResolvedValue(undefined);
 
       await handler.handle(rawMessage1);

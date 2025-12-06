@@ -112,9 +112,7 @@ export class GmoAdapter implements MarketDataAdapter {
       // ERR-5003 (Request too many) の場合は、購読リクエストの送信間隔が不十分
       // このエラーは購読リクエストの送信タイミングの問題なので、ログに記録するのみ
       if (errorMsg.includes('ERR-5003')) {
-        console.warn(
-          '[GmoAdapter] Rate limit error detected. Consider increasing subscription interval.'
-        );
+        console.warn('[GmoAdapter] Rate limit error detected. Consider increasing subscription interval.');
       }
       return;
     }
@@ -126,9 +124,7 @@ export class GmoAdapter implements MarketDataAdapter {
     }
 
     // デバッグ: 受信したメッセージのチャンネルをログ出力
-    console.log(
-      `[GmoAdapter] received message: channel=${rawMessage.channel}, symbol=${rawMessage.symbol}`
-    );
+    console.log(`[GmoAdapter] received message: channel=${rawMessage.channel}, symbol=${rawMessage.symbol}`);
 
     // メッセージハンドラに処理を委譲（正規化→配信）
     await this.messageHandler.handle(rawMessage);

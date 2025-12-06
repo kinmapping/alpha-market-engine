@@ -30,9 +30,7 @@ export class RedisPublisher implements EventPublisher {
 
     // XADD コマンドでメッセージを追加
     await this.redis.xadd(stream, '*', ...Object.entries(payload).flat());
-    console.log(
-      `[RedisPublisher] published to stream: ${stream}, type: ${event.type}, symbol: ${event.symbol}`
-    );
+    console.log(`[RedisPublisher] published to stream: ${stream}, type: ${event.type}, symbol: ${event.symbol}`);
   }
 
   /**

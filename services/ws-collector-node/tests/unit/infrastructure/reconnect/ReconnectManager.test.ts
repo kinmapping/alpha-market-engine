@@ -179,19 +179,12 @@ describe('ReconnectManager', () => {
 
       // MAX_DELAY (30000ms) に達するまで再接続を繰り返す
       // 1秒 → 2秒 → 4秒 → 8秒 → 16秒 → 30秒（上限）
+      // 実装と同じ計算式を使用（BackoffStrategy と一致）
+      const BASE_DELAY = 1000;
+      const MAX_DELAY = 30000;
+
       for (let i = 0; i < 10; i++) {
-        const delay =
-          i === 0
-            ? 1000
-            : i === 1
-              ? 2000
-              : i === 2
-                ? 4000
-                : i === 3
-                  ? 8000
-                  : i === 4
-                    ? 16000
-                    : 30000;
+        const delay = Math.min(BASE_DELAY * 2 ** i, MAX_DELAY);
         await vi.advanceTimersByTimeAsync(delay);
       }
 
