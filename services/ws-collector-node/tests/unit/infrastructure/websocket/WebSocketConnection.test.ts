@@ -54,7 +54,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onOpen(callback);
 
       // イベントを発火
-      const openCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'open');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const openCall = addEventListenerCalls.find((call) => call[0] === 'open');
       const openHandler = openCall?.[1] as () => void;
 
       if (openHandler) {
@@ -71,7 +72,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onOpen(callback2);
 
       // イベントを発火
-      const openCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'open');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const openCall = addEventListenerCalls.find((call) => call[0] === 'open');
       const openHandler = openCall?.[1] as () => void;
 
       if (openHandler) {
@@ -89,7 +91,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onMessage(callback);
 
       // イベントを発火
-      const messageCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'message');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const messageCall = addEventListenerCalls.find((call) => call[0] === 'message');
       const messageHandler = messageCall?.[1] as (event: { data: string }) => void;
       if (messageHandler) {
         messageHandler({ data: 'test message' });
@@ -103,7 +106,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onMessage(callback);
 
       const arrayBuffer = new ArrayBuffer(8);
-      const messageCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'message');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const messageCall = addEventListenerCalls.find((call) => call[0] === 'message');
       const messageHandler = messageCall?.[1] as (event: { data: ArrayBuffer }) => void;
       if (messageHandler) {
         messageHandler({ data: arrayBuffer });
@@ -117,7 +121,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onMessage(callback);
 
       const blob = new Blob(['test'], { type: 'text/plain' });
-      const messageCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'message');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const messageCall = addEventListenerCalls.find((call) => call[0] === 'message');
       const messageHandler = messageCall?.[1] as (event: { data: Blob }) => void;
       if (messageHandler) {
         messageHandler({ data: blob });
@@ -132,9 +137,10 @@ describe('StandardWebSocketConnection', () => {
       connection.onMessage(callback1);
       connection.onMessage(callback2);
 
-      const messageHandler = mockSocket.addEventListener.mock.calls.find(
-        (call) => call[0] === 'message'
-      )?.[1] as (event: { data: string }) => void;
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const messageHandler = addEventListenerCalls.find((call) => call[0] === 'message')?.[1] as (event: {
+        data: string;
+      }) => void;
       if (messageHandler) {
         messageHandler({ data: 'test' });
       }
@@ -150,7 +156,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onClose(callback);
 
       // イベントを発火
-      const closeCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'close');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const closeCall = addEventListenerCalls.find((call) => call[0] === 'close');
       const closeHandler = closeCall?.[1] as () => void;
       if (closeHandler) {
         closeHandler();
@@ -165,9 +172,8 @@ describe('StandardWebSocketConnection', () => {
       connection.onClose(callback1);
       connection.onClose(callback2);
 
-      const closeHandler = mockSocket.addEventListener.mock.calls.find(
-        (call) => call[0] === 'close'
-      )?.[1] as () => void;
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const closeHandler = addEventListenerCalls.find((call) => call[0] === 'close')?.[1] as () => void;
       if (closeHandler) {
         closeHandler();
       }
@@ -186,7 +192,8 @@ describe('StandardWebSocketConnection', () => {
       const errorEvent = new Event('error');
 
       // 'error' イベントのハンドラを取得
-      const errorCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'error');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const errorCall = addEventListenerCalls.find((call) => call[0] === 'error');
       const errorHandler = errorCall?.[1] as (event: Event) => void;
 
       if (errorHandler) {
@@ -205,7 +212,8 @@ describe('StandardWebSocketConnection', () => {
       const errorEvent = new Event('error');
 
       // 'error' イベントのハンドラを取得
-      const errorCall = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'error');
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const errorCall = addEventListenerCalls.find((call) => call[0] === 'error');
       const errorHandler = errorCall?.[1] as (event: Event) => void;
 
       if (errorHandler) {
@@ -249,7 +257,8 @@ describe('StandardWebSocketConnection', () => {
       connection.removeAllListeners();
 
       // イベントを発火してもコールバックが呼ばれない
-      const openHandler = mockSocket.addEventListener.mock.calls.find((call) => call[0] === 'open')?.[1] as () => void;
+      const addEventListenerCalls = mockSocket.addEventListener.mock.calls;
+      const openHandler = addEventListenerCalls.find((call) => call[0] === 'open')?.[1] as () => void;
       if (openHandler) {
         openHandler();
       }

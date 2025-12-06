@@ -274,6 +274,99 @@ Biome 2.3.8 では、コマンドによって設定ファイルの解釈が異�
 
 **推奨**: `npm run lint`（`biome check . && eslint .`）を使用してください。
 
+### カスタムESLintルール: `limit-chain-depth`
+
+このプロジェクトでは、チェーンメソッドの深さを制限するカスタムルール `custom-rules/limit-chain-depth` を実装しています。
+
+#### 目的
+
+チェーンメソッドが深すぎると可読性が低下するため、中間変数を使用することを推奨します。
+
+```typescript
+// ❌ 警告: 4段階のチェーンメソッド（上限: 3段階）
+const result = data.map(x => x.value).filter(v => v > 0).sort().reverse();
+
+// ✅ 推奨: 中間変数を使用
+const mapped = data.map(x => x.value);
+const filtered = mapped.filter(v => v > 0);
+const sorted = filtered.sort();
+const result = sorted.reverse();
+```
+
+#### 設定
+
+最大3段階（`maxDepth: 3`）
+
+
+設定は `eslint.config.ts` で管理されています：
+
+```typescript
+// 通常のソースコード
+'custom-rules/limit-chain-depth': ['warn', { maxDepth: 3 }],
+
+// テストファイル（tests/**/*.ts）
+'custom-rules/limit-chain-depth': ['warn', { maxDepth: 3 }],
+```
+
+#### ルールの無効化
+
+特定の行でルールを無効化する場合：
+
+```typescript
+// eslint-disable-next-line custom-rules/limit-chain-depth
+const result = data.map(x => x.value).filter(v => v > 0).sort().reverse();
+```
+
+ファイル全体で無効化する場合：
+
+```typescript
+/* eslint-disable custom-rules/limit-chain-depth */
+```
+
+#### 運用上の留意点
+
+1. **TypeScript で管理**
+   - カスタムルールは `.eslint/custom-rules/*.ts` で TypeScript として管理されています
+   - 型安全性が確保され、IDE の補完が効きます
+
+2. **ルールの修正・拡張**
+   - ルールのロジックを変更する場合は `.eslint/custom-rules/limit-chain-depth.ts` を編集
+   - 変更後は `npm run type-check` で型エラーを確認
+   - `npm run lint:eslint` で動作確認
+
+3. **`maxDepth` の調整**
+   - プロジェクトの方針に合わせて `maxDepth` を調整可能
+   - 現在は通常のソースコードとテストファイルの両方で3段階に統一
+
+4. **パフォーマンス**
+   - カスタムルールは AST を走査するため、大きなファイルでは若干のオーバーヘッドが発生する可能性があります
+   - 通常のプロジェクト規模では問題になりません
+
+5. **他のプロジェクトへの移植**
+   - `.eslint/custom-rules/` ディレクトリごとコピー
+   - `eslint.config.ts` でプラグインとして登録
+   - `jiti` パッケージが必要（ESLint v9 が TypeScript 設定を読み込むため）
+
+#### トラブルシューティング
+
+**カスタムルールが動作しない**
+
+```bash
+# ESLint の設定を確認
+npm run lint:eslint
+
+# TypeScript の型チェック
+npm run type-check
+```
+
+**`jiti` が見つからないエラー**
+
+```bash
+npm install --save-dev jiti
+```
+
+ESLint v9 は `jiti` を使用して TypeScript 設定ファイル（`eslint.config.ts`）を読み込みます。
+
 ## 参考資料
 
 - [Vitest ドキュメント](https://vitest.dev/)

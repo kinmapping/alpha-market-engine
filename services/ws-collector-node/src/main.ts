@@ -49,10 +49,10 @@ async function bootstrap(): Promise<void> {
   const messageHandler = new DefaultMessageHandler(parser, publisher);
 
   // インフラ層: SYMBOLS (カンマ区切り) から複数ペア対応のアダプタを生成
-  const adapters = SYMBOLS.split(',')
+  const symbols = SYMBOLS.split(',')
     .map((symbol) => symbol.trim())
-    .filter(Boolean)
-    .map((symbol) => new GmoAdapter(symbol, WS_PUBLIC_URL, messageHandler));
+    .filter(Boolean);
+  const adapters = symbols.map((symbol) => new GmoAdapter(symbol, WS_PUBLIC_URL, messageHandler));
 
   // すべてのアダプタを並列で起動し、WebSocket 接続を張る。
   await Promise.all(adapters.map((adapter) => adapter.start()));
