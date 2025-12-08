@@ -42,8 +42,8 @@
 本プロジェクトでは、**サービス間のメッセージング**（イベントバス）として Redis を使用しています。
 
 **具体的な用途**:
-- **ws-collector-node** → **strategy-engine**: 市場データ（ticker/orderbook/trade）を配信
-- **strategy-engine** → **execution-engine**: シグナルを配信
+- **ws-collector-node** → **trading-engine (Strategy)**: 市場データ（ticker/orderbook/trade）を配信
+- **trading-engine (Strategy)** → **trading-engine (Execution)**: シグナルを配信
 
 ### Redis を選ぶ理由
 
@@ -52,7 +52,7 @@
 市場データは**マイクロ秒単位**で変化します。データベース（PostgreSQL）に書き込んでから読み出すのでは遅すぎます。
 
 ```
-WebSocket 受信 → Redis Stream → strategy-engine 処理
+WebSocket 受信 → Redis Stream → trading-engine (Strategy) 処理
 （数ミリ秒以内）
 ```
 
@@ -101,7 +101,7 @@ Stream: md:ticker
 ```
 Stream: md:ticker
 │
-├── Consumer Group: strategy-engine
+├── Consumer Group: trading-engine-strategy
 │   ├── Consumer: strategy-1 (処理中: 1234567890-0)
 │   └── Consumer: strategy-2 (処理中: 1234567891-0)
 │
@@ -117,7 +117,7 @@ Stream: md:ticker
 ### メッセージの処理フロー
 
 1. **Producer（ws-collector-node）**: メッセージを Stream に追加（`XADD`）
-2. **Consumer（strategy-engine）**: Consumer Group でメッセージを取得（`XREADGROUP`）
+2. **Consumer（trading-engine-strategy）**: Consumer Group でメッセージを取得（`XREADGROUP`）
 3. **ACK**: 処理完了を通知（`XACK`）
 4. **再取得**: 未ACKのメッセージを再取得可能（`XREADGROUP` with `>`）
 
@@ -249,7 +249,7 @@ RedisPublisher
     ↓
 Redis Stream (md:ticker, md:orderbook, md:trade)
     ↓
-strategy-engine (Consumer Group で購読)
+trading-engine-strategy (Consumer Group で購読)
 ```
 
 ### Stream 名の規則
@@ -287,7 +287,7 @@ await publisher.publish(event);
 // → Redis Stream 'md:ticker' にメッセージが追加される
 ```
 
-### Consumer 側（strategy-engine）
+### Consumer 側（trading-engine-strategy）
 
 ```python
 import redis
@@ -296,14 +296,14 @@ redis_client = redis.Redis(host='redis', port=6379, db=0)
 
 # Consumer Group を作成（初回のみ）
 try:
-    redis_client.xgroup_create('md:ticker', 'strategy-engine', id='0', mkstream=True)
+    redis_client.xgroup_create('md:ticker', 'trading-engine-strategy', id='0', mkstream=True)
 except redis.exceptions.ResponseError:
     pass  # 既に存在する場合は無視
 
 # Consumer Group でメッセージを購読
 while True:
     messages = redis_client.xreadgroup(
-        groupname='strategy-engine',
+        groupname='trading-engine-strategy',
         consumername='strategy-1',
         streams={'md:ticker': '>'},
         count=10,
@@ -316,7 +316,7 @@ while True:
             process_ticker(data)
 
             # 処理完了を通知（ACK）
-            redis_client.xack('md:ticker', 'strategy-engine', message_id)
+            redis_client.xack('md:ticker', 'trading-engine-strategy', message_id)
 ```
 
 ### メッセージの形式
@@ -341,7 +341,7 @@ Consumer が再起動した場合、未処理（未ACK）のメッセージを�
 # 未処理メッセージを取得
 pending_messages = redis_client.xpending_range(
     name='md:ticker',
-    groupname='strategy-engine',
+    groupname='trading-engine-strategy',
     min='-',
     max='+',
     count=100
@@ -351,15 +351,15 @@ for msg in pending_messages:
     # メッセージを再取得して処理
     messages = redis_client.xclaim(
         name='md:ticker',
-        groupname='strategy-engine',
+        groupname='trading-engine-strategy',
         consumername='strategy-1',
         min_idle_time=60000,  # 60秒以上未処理のもの
         message_ids=[msg['message_id']]
     )
-    
+
     for message_id, data in messages:
         process_ticker(data)
-        redis_client.xack('md:ticker', 'strategy-engine', message_id)
+        redis_client.xack('md:ticker', 'trading-engine-strategy', message_id)
 ```
 
 ---
