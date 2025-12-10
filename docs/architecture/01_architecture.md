@@ -28,17 +28,44 @@ graph TB
     GMO["<strong>GMO WebSocket</strong><br/>(Public API)"]
     WS["<strong>ws-collector-node</strong><br/>(Node.js)<br/>WS購読 / 正規化 / <br/>Redis配信"]
     Redis["<strong>Redis</strong><br/>(Stream)"]
-    Trading["<strong>trading-engine</strong><br/>(Python)<br/>Strategy: OHLCV生成 / <br/>指標計算 / シグナル<br/>Execution: リスク管理 / <br/>注文実行"]
+    %% Trading["<strong>trading-engine</strong><br/>(Python)<br/>Strategy: OHLCV生成 / <br/>指標計算 / シグナル<br/>Execution: リスク管理 / <br/>注文実行"]
+
+    Strategy["<strong>strategy-module</strong><br/>OHLCV生成 / <br/>指標計算 / シグナル"]
+    Execution["<strong>execution-module</strong><br/>リスク管理 / <br/>注文実行"]
     DB["<strong>PostgreSQL</strong><br/>取引履歴 / OHLCV / <br/>シグナル / 注文"]
 
+    subgraph "trading-engine"
+    Strategy
+    Execution
+    end
+
     GMO -->|WebSocket| WS
-    WS -->|md:trade<br/>md:orderbook<br/>md:ticker| Redis
-    Redis -->|md:*| Trading
-    Trading -->|signal:*| Redis
-    Redis -->|signal:*| Trading
-    Trading -->|REST API| GMO
-    Trading --> DB
+    WS -->|XADD（配信）<br/>md:trade<br/>md:orderbook<br/>md:ticker| Redis
+    Redis -->|XREADGROUP（購読）<br/>md:*| Strategy
+    Strategy -->|XADD（配信）<br/>signal:*| Redis
+    Redis -->|XREADGROUP（購読）<br/>signal:*| Execution
+    Execution -->|REST API<br/>注文| GMO
+    Strategy -->|OHLCV とシグナルを保存| DB
+    %% DB --> Execution
+    Execution <-->|注文と約定の保存<br/><br/>ポジション状態の読み取り| DB
 ```
+
+**Redis Stream を介した非同期通信を行う**
+
+- ws-collector-node は Producer（配信）
+- strategy-module は Consumer（購読）→ Producer（配信）
+- execution-module は Consumer（購読）
+- Redis Stream がメッセージキューとして機能
+
+**strategy-module と execution-module の分離**
+
+- **責務の分離**: Strategy はシグナル生成、Execution は注文実行に専念
+- **独立したスケーリング**: 各モジュールを独立してスケール可能
+- **障害の影響範囲を限定**: 一方のモジュールが停止しても他方に直接影響しない
+- **エンティティクラスの共有**: 同じ DB スキーマを参照するため、`domain/models/` 配下でエンティティクラスを共有
+- **キューワーカー的な動作**: 両方とも Redis Stream を購読してメッセージを処理するキューワーカーとして動作
+
+この方式により、各サービスは独立して動作しています。
 
 ---
 
@@ -76,24 +103,27 @@ graph TB
    - Redis Stream に配信（`md:trade`, `md:orderbook`, `md:ticker`）
    - 再接続・欠損検知
 
-2. **trading-engine** (Python)
-   - **Strategy モジュール**:
-     - Redis Stream から市場データを購読
-     - OHLCV 生成（pandas/polars）
-     - テクニカル指標計算（ta-lib / pandas-ta）
-     - シグナル生成
-     - Redis Stream にシグナル発行（`signal:*`）
-     - PostgreSQL に OHLCV とシグナルを保存
-   - **Execution モジュール**:
-     - Redis Stream からシグナルを購読
-     - リスク管理・ポジション管理（DB から現在のポジションを取得）
-     - REST API で注文発行（ccxt または取引所 SDK）
-     - 約定/注文状態を監視して状態遷移
-     - PostgreSQL に注文・約定履歴を保存
-   - **共通コンポーネント**:
-     - エンティティクラス（モデル）の共有
-     - データベーススキーマの共有
-     - ログ機能の共有
+2. **strategy-module** (Python)
+   - Redis Stream から市場データを購読（`md:trade`, `md:orderbook`, `md:ticker`）
+   - OHLCV 生成（pandas/polars）
+   - テクニカル指標計算（ta-lib / pandas-ta）
+   - シグナル生成
+   - Redis Stream にシグナル発行（`signal:*`）
+   - PostgreSQL に OHLCV とシグナルを保存
+   - **キューワーカーとして動作**: Redis Stream を購読してメッセージを処理
+
+3. **execution-module** (Python)
+   - Redis Stream からシグナルを購読（`signal:*`）
+   - リスク管理・ポジション管理（DB から現在のポジションを取得）
+   - REST API で注文発行（ccxt または取引所 SDK）
+   - 約定/注文状態を監視して状態遷移
+   - PostgreSQL に注文・約定履歴を保存
+   - **キューワーカーとして動作**: Redis Stream を購読してメッセージを処理
+
+**共通コンポーネント**:
+   - エンティティクラス（モデル）の共有（`domain/models/`）
+   - データベーススキーマの共有
+   - ログ機能の共有
 
 3. **redis**
    - 低遅延のイベントバス（Stream を使用）
@@ -105,21 +135,21 @@ graph TB
 ### 通信フロー
 
 1. **ws-collector-node ↔ GMO**: Public WebSocket（ticker/orderbooks/trades）
-2. **ws-collector-node → Redis**: 正規化された市場データを Stream に配信
-3. **trading-engine (Strategy) ↔ Redis**: 市場データを購読、シグナルを配信
-4. **trading-engine (Execution) ↔ Redis**: シグナルを購読
-5. **trading-engine (Execution) ↔ GMO**: Private REST API（order, cancel, assets）
-6. **trading-engine → PostgreSQL**: OHLCV、シグナル、注文、約定、PnL を保存
-7. **trading-engine (Execution) ← PostgreSQL**: 現在のポジション状態を取得（リスク管理用）
+2. **ws-collector-node → Redis**: 正規化された市場データを Stream に配信（XADD）
+3. **strategy-module ↔ Redis**: 市場データを購読（XREADGROUP）、シグナルを配信（XADD）
+4. **execution-module ↔ Redis**: シグナルを購読（XREADGROUP）
+5. **execution-module ↔ GMO**: Private REST API（order, cancel, assets）
+6. **strategy-module → PostgreSQL**: OHLCV とシグナルを保存
+7. **execution-module ↔ PostgreSQL**: 注文・約定履歴を保存、現在のポジション状態を取得（リスク管理用）
 
 ### データフロー
 
 1. ws-collector-node が WebSocket で ticker/板/約定を購読
 2. 正規化して Redis Stream（`md:*`）に配信
-3. trading-engine (Strategy) が Redis Stream から購読
+3. strategy-module が Redis Stream から購読（キューワーカーとして動作）
 4. OHLCV 生成、指標計算、シグナル生成
 5. シグナルを Redis Stream（`signal:*`）に配信
-6. trading-engine (Execution) がシグナルを購読
+6. execution-module がシグナルを購読（キューワーカーとして動作）
 7. リスク管理チェック（DB から現在のポジションを取得）
 8. リスク管理後、REST API で注文発行
 9. 約定イベントを REST API で監視し、DB に反映
@@ -289,11 +319,11 @@ ws-collector-node:
   networks:
     - bot-net
 
-trading-engine:
+strategy-module:
   build:
-    context: ./services/trading-engine
+    context: ./services/strategy-module
     dockerfile: Dockerfile
-  container_name: trading-engine
+  container_name: strategy-module
   restart: unless-stopped
   env_file:
     - .env
@@ -302,8 +332,25 @@ trading-engine:
     REDIS_URL: redis://redis:6379/0
     DATABASE_URL: postgresql://bot:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     STRATEGY_NAME: ${STRATEGY_NAME}
-    ENABLE_STRATEGY: ${ENABLE_STRATEGY:-true}
-    ENABLE_EXECUTION: ${ENABLE_EXECUTION:-true}
+    LOG_LEVEL: ${LOG_LEVEL}
+  depends_on:
+    - redis
+    - db
+  networks:
+    - bot-net
+
+execution-module:
+  build:
+    context: ./services/execution-module
+    dockerfile: Dockerfile
+  container_name: execution-module
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    SYMBOLS: ${SYMBOLS}
+    REDIS_URL: redis://redis:6379/0
+    DATABASE_URL: postgresql://bot:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     EXCHANGE_NAME: ${EXCHANGE_NAME}
     REST_BASE_URL: ${REST_BASE_URL}
     API_KEY: ${API_KEY}
@@ -375,53 +422,93 @@ alpha-market-engine/
 │   │   ├── tsconfig.json
 │   │   └── env.example
 │   │
-│   └── trading-engine/
-│       ├── trading_engine/
+│   ├── shared/                       # 共有コード（strategy-module と execution-module で共有）
+│   │   └── domain/
+│   │       └── models/               # 共有エンティティクラス
+│   │           ├── __init__.py
+│   │           ├── ohlcv.py         # OHLCV エンティティ（両方で使用）
+│   │           ├── signal.py        # Signal エンティティ（両方で使用）
+│   │           ├── order.py         # Order エンティティ（両方で使用）
+│   │           ├── execution.py     # Execution エンティティ（両方で使用）
+│   │           └── position.py      # Position エンティティ（両方で使用）
+│   │
+│   ├── strategy-module/
+│   │   ├── strategy_engine/
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   ├── main.py
+│   │   │   ├── domain/              # ドメイン層
+│   │   │   │   ├── models/          # モジュール固有のエンティティクラス（現時点では空）
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── entities/
+│   │   │   │   └── value_objects/
+│   │   │   ├── application/         # アプリケーション層
+│   │   │   │   ├── usecases/        # ユースケース
+│   │   │   │   │   └── strategy/    # Strategy ユースケース
+│   │   │   │   │       ├── main.py
+│   │   │   │   │       ├── ohlcv_generator.py
+│   │   │   │   │       ├── indicator_calculator.py
+│   │   │   │   │       └── signal_generator.py
+│   │   │   │   ├── interfaces/      # インターフェース定義
+│   │   │   │   │   ├── strategy.py
+│   │   │   │   │   ├── ohlcv_repository.py
+│   │   │   │   │   └── signal_repository.py
+│   │   │   │   └── services/       # アプリケーションサービス
+│   │   │   │       └── signal_publisher.py
+│   │   │   └── infrastructure/      # インフラ層
+│   │   │       ├── redis/           # Redis 接続
+│   │   │       │   ├── consumer.py
+│   │   │       │   └── publisher.py
+│   │   │       ├── database/        # PostgreSQL 接続
+│   │   │       │   ├── connection.py
+│   │   │       │   ├── schema.py
+│   │   │       │   └── repositories/
+│   │   │       │       ├── ohlcv_repository.py
+│   │   │       │       └── signal_repository.py
+│   │   │       ├── strategies/      # 戦略実装
+│   │   │       │   ├── base.py
+│   │   │       │   └── moving_average_cross.py
+│   │   │       └── logger/          # ログ実装
+│   │   │           └── db_logger.py
+│   │   ├── Dockerfile
+│   │   ├── pyproject.toml
+│   │   └── .env.example
+│   │
+│   └── execution-module/
+│       ├── execution_engine/
 │       │   ├── __init__.py
 │       │   ├── config.py
 │       │   ├── main.py
 │       │   ├── domain/              # ドメイン層
-│       │   │   ├── models/          # エンティティクラス
-│       │   │   │   ├── ohlcv.py
-│       │   │   │   ├── signal.py
-│       │   │   │   ├── order.py
-│       │   │   │   ├── execution.py
-│       │   │   │   └── position.py
+│       │   │   ├── models/          # モジュール固有のエンティティクラス（現時点では空）
+│   │   │   │   └── __init__.py
 │       │   │   ├── entities/
 │       │   │   └── value_objects/
 │       │   ├── application/         # アプリケーション層
 │       │   │   ├── usecases/        # ユースケース
-│       │   │   │   ├── strategy/    # Strategy ユースケース
-│       │   │   │   │   ├── main.py
-│       │   │   │   │   ├── ohlcv_generator.py
-│       │   │   │   │   ├── indicator_calculator.py
-│       │   │   │   │   └── signal_generator.py
 │       │   │   │   └── execution/   # Execution ユースケース
 │       │   │   │       ├── main.py
 │       │   │   │       ├── risk_manager.py
 │       │   │   │       └── order_executor.py
 │       │   │   ├── interfaces/      # インターフェース定義
-│       │   │   │   ├── strategy.py
-│       │   │   │   ├── ohlcv_repository.py
-│       │   │   │   ├── signal_repository.py
 │       │   │   │   ├── order_repository.py
-│       │   │   │   └── position_repository.py
-│       │   │   └── services/       # アプリケーションサービス
-│       │   │       └── signal_publisher.py
+│       │   │   │   ├── position_repository.py
+│       │   │   │   └── execution_repository.py
 │       │   └── infrastructure/      # インフラ層
 │       │       ├── redis/           # Redis 接続
-│       │       │   ├── consumer.py
-│       │       │   └── publisher.py
+│       │       │   └── consumer.py
 │       │       ├── database/        # PostgreSQL 接続
 │       │       │   ├── connection.py
 │       │       │   ├── schema.py
 │       │       │   └── repositories/
+│       │       │       ├── order_repository.py
+│       │       │       ├── position_repository.py
+│       │       │       └── execution_repository.py
 │       │       ├── broker/          # 取引所API連携
 │       │       │   ├── gmo/
+│       │       │   │   ├── client.py
+│       │       │   │   └── order_executor.py
 │       │       │   └── monitor.py
-│       │       ├── strategies/      # 戦略実装
-│       │       │   ├── base.py
-│       │       │   └── moving_average_cross.py
 │       │       └── logger/          # ログ実装
 │       │           └── db_logger.py
 │       ├── Dockerfile
@@ -436,12 +523,115 @@ alpha-market-engine/
 └── .env
 ```
 
+### エンティティクラスの共有方法
+
+strategy-module と execution-module で使用するエンティティクラス（`Signal`, `Order`, `Execution`, `Position`）は、`shared/domain/models/` 配下に配置し、両方のモジュールから参照します。
+
+#### 共有エンティティの配置
+
+**配置場所**: `shared/domain/models/`
+
+**共有エンティティ**:
+- `ohlcv.py`: OHLCV エンティティ（strategy-module で生成、execution-module で参照可能）
+- `signal.py`: Signal エンティティ（strategy-module で生成、execution-module で消費）
+- `order.py`: Order エンティティ（execution-module で生成・管理）
+- `execution.py`: Execution エンティティ（execution-module で生成・管理）
+- `position.py`: Position エンティティ（execution-module で管理、strategy-module で参照）
+
+**モジュール固有エンティティ**:
+- 現時点では、すべてのエンティティを `shared/` 配下で共有しています
+
+#### インポート方法
+
+各モジュールから共有エンティティをインポートする際は、`PYTHONPATH` に `shared/` を追加するか、相対パスで参照します。
+
+**例: strategy-module からのインポート**:
+```python
+# strategy-module/strategy_engine/application/usecases/strategy/signal_generator.py
+import sys
+from pathlib import Path
+
+# shared/ を PYTHONPATH に追加（開発環境）
+shared_path = Path(__file__).parent.parent.parent.parent.parent / "shared"
+sys.path.insert(0, str(shared_path))
+
+from domain.models.signal import Signal
+from domain.models.ohlcv import OHLCV  # 共有エンティティ
+```
+
+**例: execution-module からのインポート**:
+```python
+# execution-module/execution_engine/application/usecases/execution/order_executor.py
+import sys
+from pathlib import Path
+
+# shared/ を PYTHONPATH に追加（開発環境）
+shared_path = Path(__file__).parent.parent.parent.parent.parent / "shared"
+sys.path.insert(0, str(shared_path))
+
+from domain.models.signal import Signal
+from domain.models.order import Order
+```
+
+#### Docker 環境での共有方法
+
+Docker 環境では、`shared/` ディレクトリを各モジュールのコンテナにコピーまたはマウントします。
+
+**方法1: Dockerfile で COPY（推奨）**:
+```dockerfile
+# strategy-module/Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 共有エンティティをコピー
+COPY ../shared/ /app/shared/
+
+# モジュール固有のコードをコピー
+COPY strategy_engine/ /app/strategy_engine/
+
+# PYTHONPATH に shared/ を追加
+ENV PYTHONPATH=/app:/app/shared
+
+CMD ["python", "-m", "strategy_engine.main"]
+```
+
+**方法2: docker-compose で volume mount**:
+```yaml
+strategy-module:
+  build:
+    context: .
+    dockerfile: services/strategy-module/Dockerfile
+  volumes:
+    - ./shared:/app/shared:ro  # 読み取り専用でマウント
+  environment:
+    PYTHONPATH: /app:/app/shared
+
+execution-module:
+  build:
+    context: .
+    dockerfile: services/execution-module/Dockerfile
+  volumes:
+    - ./shared:/app/shared:ro  # 読み取り専用でマウント
+  environment:
+    PYTHONPATH: /app:/app/shared
+```
+
+#### 運用上の注意点
+
+1. **同期の重要性**: 共有エンティティを変更する際は、両方のモジュールで互換性を保つ必要があります
+2. **変更時の影響範囲**: 共有エンティティの変更は、strategy-module と execution-module の両方に影響するため、慎重に検討します
+3. **バージョン管理**: 共有エンティティの変更履歴は Git で管理し、変更理由を明確にします
+4. **テスト**: 共有エンティティの変更時は、両方のモジュールのテストを実行します
+5. **将来的な分離**: 必要に応じて、共有エンティティを独立した Python パッケージとして分離することも可能です
+
 ### この構成のメリット
 
 - WS落ちても **取りこぼしゼロで復帰**
 - 戦略はPython資産（pandas/AI/バックテスト）をそのまま流用
 - WS負荷が上がっても Node 側を水平スケールしやすい
 - 取引所追加が "adapter追加" で済む
+- **エンティティクラスの一元管理**: 共有エンティティを `shared/` 配下で一元管理し、一貫性を保つ
 
 ---
 
@@ -517,6 +707,7 @@ Executionは Redisに「注文イベント」も出すと観測性が上がる�
 
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/)
 - [ws-collector-node 設計](./02_ws_collector_node.md)
-- [trading-engine 設計](./03_trading_engine.md)
+- [strategy-module 設計](./03_strategy_archi.md)
+- [execution-module 設計](./04_execution_archi.md)
 - [コード規約](../coding_standards.md)
 

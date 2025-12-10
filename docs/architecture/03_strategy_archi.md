@@ -1,6 +1,6 @@
-# Trading Engine アーキテクチャ
+# Strategy Module アーキテクチャ
 
-trading-engine の設計と実装方針。Strategy モジュール（戦略評価）と Execution モジュール（注文実行）を統合したサービスで、Redis Stream から市場データを購読し、OHLCV 生成、テクニカル指標計算、シグナル生成、リスク管理、注文実行を行う。
+strategy-module の設計と実装方針。Redis Stream から市場データを購読し、OHLCV 生成、テクニカル指標計算、シグナル生成を行う。キューワーカーとして動作し、生成したシグナルを Redis Stream に配信する。
 
 ## 目次
 
@@ -8,11 +8,10 @@ trading-engine の設計と実装方針。Strategy モジュール（戦略評�
 2. [データフロー](#データフロー)
 3. [コンポーネント設計](#コンポーネント設計)
 4. [戦略の実装](#戦略の実装)
-5. [実行エンジンの実装](#実行エンジンの実装)
-6. [データベース設計](#データベース設計)
-7. [ディレクトリ構成](#ディレクトリ構成)
-8. [設定管理](#設定管理)
-9. [参考資料](#参考資料)
+5. [データベース設計](#データベース設計)
+6. [ディレクトリ構成](#ディレクトリ構成)
+7. [設定管理](#設定管理)
+8. [参考資料](#参考資料)
 
 ---
 
@@ -20,34 +19,23 @@ trading-engine の設計と実装方針。Strategy モジュール（戦略評�
 
 ### 責務
 
-trading-engine は以下の責務を持つ:
+strategy-module は以下の責務を持つ:
 
-#### Strategy モジュール（戦略評価）
-
-- **Redis Stream 購読**: `md:trade`, `md:orderbook`, `md:ticker` を Consumer Group で購読
+- **Redis Stream 購読**: `md:trade`, `md:orderbook`, `md:ticker` を Consumer Group で購読（キューワーカーとして動作）
 - **OHLCV 生成**: 市場データから OHLCV（1秒/1分など）を生成
 - **テクニカル指標計算**: ta-lib / pandas-ta を使用して指標を計算
 - **シグナル生成**: 戦略ロジックで売買シグナルを生成
 - **シグナル配信**: 生成したシグナルを Redis Stream（`signal:*`）に配信
 - **データ永続化**: OHLCV とシグナルを PostgreSQL に保存
 
-#### Execution モジュール（注文実行）
-
-- **シグナル購読**: Redis Stream からシグナルを購読
-- **リスク管理**: ポジションサイズ、ドローダウン、連続損失などのリスクチェック
-- **ポジション管理**: 現在のポジション状態を DB から取得・更新
-- **注文発行**: REST API で注文を発行（ccxt または取引所 SDK）
-- **約定監視**: 注文状態を監視して状態遷移（NEW→PARTIALLY_FILLED→FILLED/CANCELED）
-- **データ永続化**: 注文・約定履歴を PostgreSQL に保存
-
 ### 基本方針
 
-- **イベント駆動**: Redis Stream から市場データとシグナルを購読し、リアルタイムで処理
+- **イベント駆動**: Redis Stream から市場データを購読し、リアルタイムで処理
 - **取りこぼしゼロ**: Consumer Group を使用して、再起動時もデータを取りこぼさない
+- **キューワーカーとして動作**: Redis Stream を購読してメッセージを処理するバックグラウンドワーカー
 - **戦略の交換可能性**: 戦略ロジックを独立したコンポーネントとして実装し、交換可能にする
 - **段階的な発展**: 初期はルールベース、将来的に AI/ML モデルに置き換え可能
-- **エンティティ共有**: Strategy と Execution でエンティティクラス（モデル）を共有し、一貫性を保つ
-- **統合サービス**: 初期段階では統合サービスとして実装し、将来必要に応じて分離可能な設計
+- **エンティティ共有**: execution-module とエンティティクラス（モデル）を共有し、一貫性を保つ（`shared/domain/models/`）
 
 ---
 
@@ -57,20 +45,13 @@ trading-engine は以下の責務を持つ:
 
 ```mermaid
 graph LR
-    Redis[Redis Stream<br/>md:*]
-    Strategy[Strategy Module<br/>OHLCV生成<br/>指標計算<br/>シグナル生成]
-    Redis2[Redis Stream<br/>signal:*]
-    Execution[Execution Module<br/>リスク管理<br/>注文実行]
-    GMO[GMO REST API]
-    DB[PostgreSQL]
+    Redis["<strong>Redis</strong><br/>(同一インスタンス)"]
+    Strategy["<strong>Strategy Module</strong><br/>OHLCV生成<br/>指標計算<br/>シグナル生成"]
+    DB["<strong>PostgreSQL</strong><br/>OHLCV / シグナル"]
 
-    Redis -->|購読| Strategy
-    Strategy -->|配信| Redis2
-    Redis2 -->|購読| Execution
-    Execution -->|注文| GMO
-    Strategy -->|保存| DB
-    Execution -->|保存| DB
-    Execution -->|読み取り| DB
+    Redis -->|XREADGROUP<br/>購読<br/>md:ticker<br/>md:orderbook<br/>md:trade| Strategy
+    Strategy -->|XADD<br/>配信<br/>signal:*| Redis
+    Strategy -->|保存<br/>OHLCV / シグナル| DB
 ```
 
 ### Strategy ユースケースのメインループ（Application 層）
@@ -100,7 +81,7 @@ signal_generator = SignalGeneratorUseCase(strategy_factory.create(STRATEGY_NAME)
 
 # Consumer Group で市場データを購読
 for message in redis_consumer.consume(
-    group="trading-engine-strategy",
+    group="strategy-module",
     consumer="strategy-1",
     streams={"md:ticker": ">", "md:orderbook": ">", "md:trade": ">"}
 ):
@@ -117,70 +98,16 @@ for message in redis_consumer.consume(
         db_logger.log_ohlcv(ohlcv)
 ```
 
-### Execution ユースケースのメインループ（Application 層）
-
-```python
-# application/usecases/execution/main.py
-from infrastructure.redis.consumer import RedisStreamConsumer
-from application.usecases.execution.risk_manager import RiskManagerUseCase
-from application.usecases.execution.order_executor import OrderExecutorUseCase
-from infrastructure.database.repositories.position_repository import PositionRepository
-from infrastructure.database.repositories.order_repository import OrderRepository
-from infrastructure.broker.gmo.client import GmoClient
-from infrastructure.logger.db_logger import DBLogger
-
-# Infrastructure 層のコンポーネントを注入
-redis_consumer = RedisStreamConsumer(REDIS_URL)
-position_repo = PositionRepository(DATABASE_URL)
-order_repo = OrderRepository(DATABASE_URL)
-broker_client = GmoClient(API_KEY, API_SECRET)
-db_logger = DBLogger(DATABASE_URL)
-
-# Application 層のユースケースを初期化
-risk_manager = RiskManagerUseCase(position_repo, MAX_POSITION_SIZE, MAX_DRAWDOWN_PCT)
-order_executor = OrderExecutorUseCase(broker_client, order_repo)
-
-# Consumer Group でシグナルを購読
-for message in redis_consumer.consume(
-    group="trading-engine-execution",
-    consumer="execution-1",
-    streams={"signal:gmo": ">"}
-):
-    signal = parse_signal(message)  # Domain 層の Signal エンティティに変換
-
-    # Application 層のユースケースを実行
-    if not risk_manager.check_risk(signal):
-        db_logger.log_rejected_signal(signal, reason="risk_limit")
-        continue
-
-    order = order_executor.execute(signal)
-
-    # Infrastructure 層のリポジトリを使用
-    order_repo.save(order)
-    db_logger.log_order(order)
-
-    # 約定監視（非同期）
-    asyncio.create_task(monitor_order(order))
-```
-
 ### データフロー詳細（レイヤードアーキテクチャ）
 
 #### Strategy ユースケースのフロー
 
-1. **Infrastructure 層**: Redis Stream から市場データ（`md:*`）を購読
+1. **Infrastructure 層**: Redis Stream から市場データ（`md:*`）を購読（XREADGROUP）
 2. **Application 層**: OHLCV 生成ユースケースを実行（Domain 層の OHLCV エンティティを使用）
 3. **Application 層**: 指標計算ユースケースを実行
 4. **Application 層**: シグナル生成ユースケースを実行（Infrastructure 層の Strategy 実装を使用）
-5. **Infrastructure 層**: シグナルを Redis Stream（`signal:*`）に配信
+5. **Infrastructure 層**: シグナルを Redis Stream（`signal:*`）に配信（XADD）
 6. **Infrastructure 層**: OHLCV とシグナルを PostgreSQL に保存（リポジトリ経由）
-
-#### Execution ユースケースのフロー
-
-1. **Infrastructure 層**: Redis Stream からシグナル（`signal:*`）を購読
-2. **Application 層**: リスク管理ユースケースを実行（Infrastructure 層の PositionRepository を使用して DB から取得）
-3. **Application 層**: 注文実行ユースケースを実行（Infrastructure 層の BrokerClient を使用）
-4. **Infrastructure 層**: 約定/注文状態を監視
-5. **Infrastructure 層**: 注文・約定履歴を PostgreSQL に保存（リポジトリ経由）
 
 ---
 
@@ -194,14 +121,11 @@ for message in redis_consumer.consume(
 - ビジネスロジックに依存しない、純粋なデータ構造
 - ドメインの概念を表現
 
-**配置**: `domain/models/`
+**配置**: `shared/domain/models/`
 
 **主要エンティティ**:
-- `OHLCV`: OHLCV データのエンティティ
-- `Signal`: シグナルのエンティティ
-- `Order`: 注文のエンティティ
-- `Execution`: 約定のエンティティ
-- `Position`: ポジションのエンティティ
+- すべてのエンティティ（`OHLCV`, `Signal`, `Order`, `Execution`, `Position`）は `shared/domain/models/` 配下で共有されます
+- strategy-module では `OHLCV` と `Signal` を主に使用します
 
 ### Application 層のコンポーネント
 
@@ -218,17 +142,6 @@ for message in redis_consumer.consume(
 - `indicator_calculator.py`: 指標計算ユースケース
 - `signal_generator.py`: シグナル生成ユースケース
 
-#### Execution ユースケース
-
-**責務**:
-- リスク管理、注文実行のオーケストレーション
-- Infrastructure 層のコンポーネントを組み合わせて、1つのビジネス操作を実現
-
-**配置**: `application/usecases/execution/`
-
-**主要ユースケース**:
-- `risk_manager.py`: リスク管理ユースケース
-- `order_executor.py`: 注文実行ユースケース
 
 #### インターフェース（契約）
 
@@ -242,8 +155,6 @@ for message in redis_consumer.consume(
 - `strategy.py`: Strategy インターフェース
 - `ohlcv_repository.py`: OHLCV リポジトリインターフェース
 - `signal_repository.py`: Signal リポジトリインターフェース
-- `order_repository.py`: Order リポジトリインターフェース
-- `position_repository.py`: Position リポジトリインターフェース
 
 **例: Strategy インターフェース**:
 ```python
@@ -314,21 +225,7 @@ class Strategy(ABC):
 - `schema.py`: SQLAlchemy モデル定義
 - `repositories/ohlcv_repository.py`: OHLCV リポジトリ実装
 - `repositories/signal_repository.py`: Signal リポジトリ実装
-- `repositories/order_repository.py`: Order リポジトリ実装
-- `repositories/position_repository.py`: Position リポジトリ実装
 
-#### 取引所API連携
-
-**責務**:
-- 取引所 REST API との連携実装
-- 注文発行、約定監視の実装
-
-**配置**: `infrastructure/broker/`
-
-**主要コンポーネント**:
-- `gmo/client.py`: GMO コイン REST API クライアント
-- `gmo/order_executor.py`: GMO コイン注文実行実装
-- `monitor.py`: 注文監視実装
 
 #### 戦略実装
 
@@ -426,8 +323,8 @@ class Strategy(ABC):
 - **配置**: `infrastructure/strategies/lstm_strategy.py`, `infrastructure/strategies/transformer_strategy.py`
 
 **重要なポイント**:
-- 予測精度そのものより「どの市場状態で機能するか」が重要
-- モデル選びは環境選びと言える
+  - 予測精度そのものより「どの市場状態で機能するか」が重要
+  - モデル選びは環境選びと言える
 
 #### LLM を使った戦略
 
@@ -442,46 +339,6 @@ class Strategy(ABC):
 
 **pandas ベース自作 or backtrader**:
 - イベント駆動シミュレータ: 実運用と同じループ構造で過去WS相当を流す → "本番との差分バグ"が激減する
-
----
-
-## 実行エンジンの実装
-
-### リスク管理
-
-**ポジションサイズ制限**:
-- 最大ポジションサイズをチェック
-- 現在のポジション + 新規注文サイズが上限を超えないか確認
-
-**ドローダウン制限**:
-- 直近 N 日間の損益を計算
-- 最大ドローダウン率を超えた場合は取引を停止
-
-**連続損失制限**:
-- 連続損失回数をカウント
-- 閾値を超えた場合は取引を一時停止
-
-### 注文実行
-
-**注文タイプ**:
-- **指値注文（Limit Order）**: 指定価格で注文を板に置く（Maker）
-- **成行注文（Market Order）**: 即座に約定を優先（Taker）
-
-**注文状態管理**:
-- NEW: 注文が発行された
-- PARTIALLY_FILLED: 一部約定
-- FILLED: 完全約定
-- CANCELED: 取消
-- REJECTED: 拒否
-
-### 約定監視
-
-**ポーリング方式**:
-- REST API で定期的に注文状態を確認
-- 約定イベントを検知して処理
-
-**WebSocket 方式（将来）**:
-- 取引所が Private WebSocket を提供している場合、リアルタイムで約定イベントを受信
 
 ---
 
@@ -546,96 +403,6 @@ CREATE INDEX idx_signals_action ON signals(action, timestamp DESC);
 - 戦略のパフォーマンス分析
 - デバッグとトラブルシューティング
 
-### orders テーブル
-
-発行した注文を記録するテーブル。
-
-**スキーマ**:
-```sql
-CREATE TABLE orders (
-    id SERIAL PRIMARY KEY,
-    exchange VARCHAR(50) NOT NULL,
-    symbol VARCHAR(20) NOT NULL,
-    order_id VARCHAR(100) NOT NULL UNIQUE,  -- 取引所の注文ID
-    signal_id INTEGER REFERENCES signals(id),
-    side VARCHAR(10) NOT NULL,  -- 'BUY', 'SELL'
-    order_type VARCHAR(20) NOT NULL,  -- 'LIMIT', 'MARKET'
-    price DECIMAL(20, 8),
-    size DECIMAL(20, 8) NOT NULL,
-    status VARCHAR(20) NOT NULL,  -- 'NEW', 'PARTIALLY_FILLED', 'FILLED', 'CANCELED', 'REJECTED'
-    filled_size DECIMAL(20, 8) DEFAULT 0,
-    average_price DECIMAL(20, 8),
-    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_orders_exchange_symbol ON orders(exchange, symbol, timestamp DESC);
-CREATE INDEX idx_orders_status ON orders(status, timestamp DESC);
-CREATE INDEX idx_orders_signal_id ON orders(signal_id);
-```
-
-**用途**:
-- 注文の履歴管理
-- 注文状態の追跡
-- パフォーマンス分析
-
-### executions テーブル
-
-約定情報を記録するテーブル。
-
-**スキーマ**:
-```sql
-CREATE TABLE executions (
-    id SERIAL PRIMARY KEY,
-    exchange VARCHAR(50) NOT NULL,
-    symbol VARCHAR(20) NOT NULL,
-    order_id INTEGER REFERENCES orders(id),
-    execution_id VARCHAR(100) NOT NULL UNIQUE,  -- 取引所の約定ID
-    side VARCHAR(10) NOT NULL,  -- 'BUY', 'SELL'
-    price DECIMAL(20, 8) NOT NULL,
-    size DECIMAL(20, 8) NOT NULL,
-    fee DECIMAL(20, 8) DEFAULT 0,
-    timestamp TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_executions_exchange_symbol ON executions(exchange, symbol, timestamp DESC);
-CREATE INDEX idx_executions_order_id ON executions(order_id);
-CREATE INDEX idx_executions_timestamp ON executions(timestamp DESC);
-```
-
-**用途**:
-- 約定履歴の管理
-- 損益計算
-- 税金計算用のデータ
-
-### positions テーブル
-
-現在のポジションを管理するテーブル（リスク管理用）。
-
-**スキーマ**:
-```sql
-CREATE TABLE positions (
-    id SERIAL PRIMARY KEY,
-    exchange VARCHAR(50) NOT NULL,
-    symbol VARCHAR(20) NOT NULL,
-    side VARCHAR(10) NOT NULL,  -- 'LONG', 'SHORT'
-    size DECIMAL(20, 8) NOT NULL,
-    average_price DECIMAL(20, 8) NOT NULL,
-    unrealized_pnl DECIMAL(20, 8) DEFAULT 0,
-    realized_pnl DECIMAL(20, 8) DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(exchange, symbol)
-);
-
-CREATE INDEX idx_positions_exchange_symbol ON positions(exchange, symbol);
-```
-
-**用途**:
-- 現在のポジション状態の管理
-- リスク管理（最大ポジションサイズチェック）
-- 損益計算
 
 ---
 
@@ -643,50 +410,38 @@ CREATE INDEX idx_positions_exchange_symbol ON positions(exchange, symbol);
 
 ### レイヤードアーキテクチャ
 
-trading-engine はレイヤードアーキテクチャを採用し、責務に基づいて層を分離します。
+strategy-module はレイヤードアーキテクチャを採用し、責務に基づいて層を分離します。
 
 ```
 services/
-└── trading-engine/
-    ├── trading_engine/
+└── strategy-module/
+    ├── strategy_engine/
     │   ├── __init__.py
     │   ├── config.py              # 設定管理
-    │   ├── main.py                # エントリーポイント（Strategy/Execution を起動）
+    │   ├── main.py                # エントリーポイント（Strategy メインループ）
     │   │
     │   ├── domain/                 # ドメイン層: ビジネスロジックとエンティティ
     │   │   ├── __init__.py
-    │   │   ├── models/            # エンティティクラス
-    │   │   │   ├── __init__.py
-    │   │   │   ├── ohlcv.py       # OHLCV モデル
-    │   │   │   ├── signal.py      # Signal モデル
-    │   │   │   ├── order.py       # Order モデル
-    │   │   │   ├── execution.py   # Execution モデル
-    │   │   │   └── position.py    # Position モデル
+    │   │   ├── models/            # モジュール固有のエンティティクラス（現時点では空）
+    │   │   │   └── __init__.py
     │   │   ├── entities/          # ドメインエンティティ（将来拡張用）
     │   │   └── value_objects/     # 値オブジェクト（将来拡張用）
     │   │
     │   ├── application/            # アプリケーション層: ユースケースとインターフェース
     │   │   ├── __init__.py
-    │   │   ├── usecases/          # ユースケース（Strategy, Execution）
+    │   │   ├── usecases/          # ユースケース（Strategy）
     │   │   │   ├── __init__.py
-    │   │   │   ├── strategy/     # Strategy ユースケース
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── main.py   # Strategy メインループ
-    │   │   │   │   ├── ohlcv_generator.py  # OHLCV 生成ユースケース
-    │   │   │   │   ├── indicator_calculator.py  # 指標計算ユースケース
-    │   │   │   │   └── signal_generator.py  # シグナル生成ユースケース
-    │   │   │   └── execution/    # Execution ユースケース
+    │   │   │   └── strategy/     # Strategy ユースケース
     │   │   │       ├── __init__.py
-    │   │   │       ├── main.py   # Execution メインループ
-    │   │   │       ├── risk_manager.py  # リスク管理ユースケース
-    │   │   │       └── order_executor.py  # 注文実行ユースケース
+    │   │   │       ├── main.py   # Strategy メインループ
+    │   │   │       ├── ohlcv_generator.py  # OHLCV 生成ユースケース
+    │   │   │       ├── indicator_calculator.py  # 指標計算ユースケース
+    │   │   │       └── signal_generator.py  # シグナル生成ユースケース
     │   │   ├── interfaces/        # インターフェース定義
     │   │   │   ├── __init__.py
     │   │   │   ├── strategy.py   # Strategy インターフェース
     │   │   │   ├── ohlcv_repository.py  # OHLCV リポジトリインターフェース
-    │   │   │   ├── signal_repository.py  # Signal リポジトリインターフェース
-    │   │   │   ├── order_repository.py  # Order リポジトリインターフェース
-    │   │   │   └── position_repository.py  # Position リポジトリインターフェース
+    │   │   │   └── signal_repository.py  # Signal リポジトリインターフェース
     │   │   └── services/         # アプリケーションサービス
     │   │       ├── __init__.py
     │   │       └── signal_publisher.py  # シグナル配信サービス
@@ -704,17 +459,8 @@ services/
     │       │   ├── repositories/  # リポジトリ実装
     │       │   │   ├── __init__.py
     │       │   │   ├── ohlcv_repository.py
-    │       │   │   ├── signal_repository.py
-    │       │   │   ├── order_repository.py
-    │       │   │   └── position_repository.py
+    │       │   │   └── signal_repository.py
     │       │   └── migrations/    # Alembic マイグレーション
-    │       ├── broker/            # 取引所API連携
-    │       │   ├── __init__.py
-    │       │   ├── gmo/          # GMO コイン実装
-    │       │   │   ├── __init__.py
-    │       │   │   ├── client.py  # REST API クライアント
-    │       │   │   └── order_executor.py  # 注文実行実装
-    │       │   └── monitor.py    # 注文監視実装
     │       ├── strategies/        # 戦略実装（インフラ層として扱う）
     │       │   ├── __init__.py
     │       │   ├── base.py        # Strategy 基底クラス
@@ -762,8 +508,6 @@ services/
 **ユースケース例**:
 - `strategy/ohlcv_generator.py`: OHLCV 生成ユースケース
 - `strategy/signal_generator.py`: シグナル生成ユースケース
-- `execution/risk_manager.py`: リスク管理ユースケース
-- `execution/order_executor.py`: 注文実行ユースケース
 
 #### Infrastructure 層（インフラ層）
 
@@ -776,7 +520,7 @@ services/
 **実装例**:
 - `redis/consumer.py`: Redis Stream からの購読実装
 - `database/repositories/ohlcv_repository.py`: OHLCV リポジトリの実装
-- `broker/gmo/client.py`: GMO コイン REST API クライアント
+- `database/repositories/signal_repository.py`: Signal リポジトリの実装
 - `strategies/moving_average_cross.py`: 移動平均クロス戦略の実装
 
 ### 依存関係の方向
@@ -796,11 +540,11 @@ Infrastructure 層
 
 ### エンティティクラスの配置
 
-`domain/models/` 配下にエンティティクラスを定義し、Application 層と Infrastructure 層の両方から参照する。
+エンティティクラスは `shared/domain/models/` 配下に定義し、Application 層と Infrastructure 層の両方から参照します。`PYTHONPATH` に `shared/` を追加することで、各モジュールからインポート可能です。
 
 **例: Signal エンティティ**:
 ```python
-# domain/models/signal.py
+# shared/domain/models/signal.py
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -823,9 +567,29 @@ class Signal:
             self.timestamp = datetime.now()
 ```
 
+**例: OHLCV エンティティ**:
+```python
+# shared/domain/models/ohlcv.py
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+
+@dataclass
+class OHLCV:
+    exchange: str
+    symbol: str
+    timeframe: str  # '1s', '1m', '5m', etc.
+    timestamp: datetime
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal
+```
+
 **例: Order エンティティ**:
 ```python
-# domain/models/order.py
+# shared/domain/models/order.py
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -907,7 +671,7 @@ class SignalRepositoryImpl(SignalRepository):
 
 ### 環境変数（.env）
 
-trading-engine の設定は環境変数で管理する。
+strategy-module の設定は環境変数で管理する。
 
 **必須設定**:
 ```env
@@ -920,21 +684,6 @@ DATABASE_URL=postgresql://bot:password@db:5432/bot_db
 # 購読設定
 SYMBOLS=BTC_JPY,ETH_JPY
 STRATEGY_NAME=moving_average_cross
-
-# 実行設定
-ENABLE_STRATEGY=true
-ENABLE_EXECUTION=true
-
-# リスク管理設定
-MAX_POSITION_SIZE=0.05  # BTC等の上限
-MAX_DRAWDOWN_PCT=5      # 最大ドローダウン率（%）
-MAX_CONSECUTIVE_LOSSES=5 # 最大連続損失回数
-
-# 取引所API設定
-EXCHANGE_NAME=gmo
-REST_BASE_URL=https://api.coin.z.com
-API_KEY=xxxx
-API_SECRET=yyyy
 
 # ログ設定
 LOG_LEVEL=INFO
@@ -975,21 +724,6 @@ class Config:
     SYMBOLS: List[str] = os.getenv("SYMBOLS", "BTC_JPY").split(",")
     STRATEGY_NAME: str = os.getenv("STRATEGY_NAME", "moving_average_cross")
 
-    # 実行設定
-    ENABLE_STRATEGY: bool = os.getenv("ENABLE_STRATEGY", "true").lower() == "true"
-    ENABLE_EXECUTION: bool = os.getenv("ENABLE_EXECUTION", "true").lower() == "true"
-
-    # リスク管理設定
-    MAX_POSITION_SIZE: float = float(os.getenv("MAX_POSITION_SIZE", "0.05"))
-    MAX_DRAWDOWN_PCT: float = float(os.getenv("MAX_DRAWDOWN_PCT", "5"))
-    MAX_CONSECUTIVE_LOSSES: int = int(os.getenv("MAX_CONSECUTIVE_LOSSES", "5"))
-
-    # 取引所API設定
-    EXCHANGE_NAME: str = os.getenv("EXCHANGE_NAME", "gmo")
-    REST_BASE_URL: str = os.getenv("REST_BASE_URL", "")
-    API_KEY: str = os.getenv("API_KEY", "")
-    API_SECRET: str = os.getenv("API_SECRET", "")
-
     # 戦略パラメータ
     MA_FAST_WINDOW: int = int(os.getenv("MA_FAST_WINDOW", "5"))
     MA_SLOW_WINDOW: int = int(os.getenv("MA_SLOW_WINDOW", "20"))
@@ -1011,6 +745,7 @@ class Config:
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/)
 - [architecture.md](./01_architecture.md) - システム全体のアーキテクチャ
 - [ws_collector_node.md](./02_ws_collector_node.md) - WebSocket データコレクターの設計
+- [execution-module 設計](./04_execution_archi.md) - Execution モジュールの設計
 - [trading_domain.md](../domain/trading_domain.md) - 取引ドメインのルール
 - [coding_standards.md](../coding_standards.md) - コード規約
 
