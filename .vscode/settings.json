@@ -146,6 +146,7 @@
     "ioredis",
     "klines",
     "Losscut",
+    "OHLC",
     "ohlcv",
     "orderbooks",
     "pycache",
