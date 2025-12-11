@@ -11,7 +11,8 @@ services:
     container_name: ws-collector-node
     restart: unless-stopped
     env_file:
-      - ./services/ws-collector-node/env.example
+      - .env
+      - ./services/ws-collector-node/.env
     environment:
       # 必須環境変数（env_file またはホスト環境変数から取得）
       # 未設定の場合は main.ts の requireEnv() でエラーとなる
@@ -54,28 +55,28 @@ services:
   #   command: ["python", "-m", "rest_client.main"]
 
   # 3) Redis/DBからデータ購読→戦略(シグナル)生成
-  # strategy-engine:
-  #   build:
-  #     context: .
-  #     dockerfile: ./services/strategy-engine/Dockerfile
-  #   container_name: strategy-engine
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     SYMBOLS: ${SYMBOLS:-BTC_JPY,ETH_JPY}
-  #     REDIS_URL: redis://redis:6379/0
-  #     DATABASE_URL: postgresql://bot:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-  #     STRATEGY_NAME: ${STRATEGY_NAME:-sample_breakout}
-  #     LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  #   depends_on:
-  #     - redis
-  #     - db
-  #   networks:
-  #     - bot-net
-  #   volumes:
-  #     - ./services/strategy-engine:/app
-  #   command: ["python", "-m", "strategy_engine.main"]
+  strategy-module:
+    build:
+      context: .
+      dockerfile: ./services/strategy_module/Dockerfile
+    container_name: strategy-module
+    restart: unless-stopped
+    env_file:
+      - .env
+      - ./services/strategy_module/.env  # strategy-module 固有の環境変数（STRATEGY_NAME など）
+    environment:
+      # 環境変数のデフォルト値（env_file で上書き可能）
+      SYMBOLS: ${SYMBOLS:-BTC_JPY,ETH_JPY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-}
+      STRATEGY_NAME: ${STRATEGY_NAME:-moving_average_cross}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENABLE_HTTP: ${ENABLE_HTTP:-false}
+      HTTP_PORT: ${HTTP_PORT:-8000}
+    depends_on:
+      - redis
+    networks:
+      - bot-net
 
   # 4) シグナル購読→リスク管理→注文発行→約定管理
   # execution-engine:
