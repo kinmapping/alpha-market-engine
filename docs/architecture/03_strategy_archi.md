@@ -63,14 +63,16 @@ from application.usecases.strategy.ohlcv_generator import OHLCVGeneratorUseCase
 from application.usecases.strategy.indicator_calculator import IndicatorCalculatorUseCase
 from application.usecases.strategy.signal_generator import SignalGeneratorUseCase
 from application.services.signal_publisher import SignalPublisherService
-from infrastructure.database.repositories.ohlcv_repository import OHLCVRepository
-from infrastructure.database.repositories.signal_repository import SignalRepository
+from shared.application.interfaces.ohlcv_repository import OhlcvRepository
+from shared.application.interfaces.signal_repository import SignalRepository
+from infrastructure.database.repositories.ohlcv_repository import OhlcvRepositoryImpl
+from infrastructure.database.repositories.signal_repository import SignalRepositoryImpl
 from infrastructure.logger.db_logger import DBLogger
 
 # Infrastructure 層のコンポーネントを注入
 redis_consumer = RedisStreamConsumer(REDIS_URL)
-ohlcv_repo = OHLCVRepository(DATABASE_URL)
-signal_repo = SignalRepository(DATABASE_URL)
+ohlcv_repo = OhlcvRepositoryImpl(DATABASE_URL)
+signal_repo = SignalRepositoryImpl(DATABASE_URL)
 signal_publisher = SignalPublisherService(redis_consumer)
 db_logger = DBLogger(DATABASE_URL)
 
@@ -149,12 +151,14 @@ for message in redis_consumer.consume(
 - Infrastructure 層が実装すべきインターフェースを定義
 - 依存性逆転の原則（DIP）を実現
 
-**配置**: `application/interfaces/`
+**配置**:
+- **共有インターフェース**: `shared/application/interfaces/`（`ohlcv_repository.py`, `signal_repository.py`）
+- **モジュール固有インターフェース**: `application/interfaces/`（`strategy.py`）
 
 **主要インターフェース**:
-- `strategy.py`: Strategy インターフェース
-- `ohlcv_repository.py`: OHLCV リポジトリインターフェース
-- `signal_repository.py`: Signal リポジトリインターフェース
+- `strategy.py`: Strategy インターフェース（モジュール固有）
+- `ohlcv_repository.py`: OHLCV リポジトリインターフェース（`shared/application/interfaces/` から共有）
+- `signal_repository.py`: Signal リポジトリインターフェース（`shared/application/interfaces/` から共有）
 
 **例: Strategy インターフェース**:
 ```python
@@ -414,60 +418,59 @@ strategy-module はレイヤードアーキテクチャを採用し、責務に�
 
 ```
 services/
-└── strategy-module/
-    ├── strategy_engine/
+└── strategy_module/
+    ├── __init__.py
+    ├── config.py              # 設定管理
+    ├── main.py                # エントリーポイント（Strategy メインループ）
+    │
+    ├── domain/                 # ドメイン層: ビジネスロジックとエンティティ
     │   ├── __init__.py
-    │   ├── config.py              # 設定管理
-    │   ├── main.py                # エントリーポイント（Strategy メインループ）
-    │   │
-    │   ├── domain/                 # ドメイン層: ビジネスロジックとエンティティ
+    │   ├── models/            # モジュール固有のエンティティクラス（現時点では空）
+    │   │   └── __init__.py
+    │   ├── entities/          # ドメインエンティティ（将来拡張用）
+    │   └── value_objects/     # 値オブジェクト（将来拡張用）
+    │
+    ├── application/            # アプリケーション層: ユースケースとインターフェース
+    │   ├── __init__.py
+    │   ├── usecases/          # ユースケース（Strategy）
     │   │   ├── __init__.py
-    │   │   ├── models/            # モジュール固有のエンティティクラス（現時点では空）
-    │   │   │   └── __init__.py
-    │   │   ├── entities/          # ドメインエンティティ（将来拡張用）
-    │   │   └── value_objects/     # 値オブジェクト（将来拡張用）
-    │   │
-    │   ├── application/            # アプリケーション層: ユースケースとインターフェース
-    │   │   ├── __init__.py
-    │   │   ├── usecases/          # ユースケース（Strategy）
-    │   │   │   ├── __init__.py
-    │   │   │   └── strategy/     # Strategy ユースケース
-    │   │   │       ├── __init__.py
-    │   │   │       ├── main.py   # Strategy メインループ
-    │   │   │       ├── ohlcv_generator.py  # OHLCV 生成ユースケース
-    │   │   │       ├── indicator_calculator.py  # 指標計算ユースケース
-    │   │   │       └── signal_generator.py  # シグナル生成ユースケース
-    │   │   ├── interfaces/        # インターフェース定義
-    │   │   │   ├── __init__.py
-    │   │   │   ├── strategy.py   # Strategy インターフェース
-    │   │   │   ├── ohlcv_repository.py  # OHLCV リポジトリインターフェース
-    │   │   │   └── signal_repository.py  # Signal リポジトリインターフェース
-    │   │   └── services/         # アプリケーションサービス
+    │   │   └── strategy/     # Strategy ユースケース
     │   │       ├── __init__.py
-    │   │       └── signal_publisher.py  # シグナル配信サービス
-    │   │
-    │   └── infrastructure/         # インフラ層: 外部システム連携
+    │   │       ├── main.py   # Strategy メインループ
+    │   │       ├── ohlcv_generator.py  # OHLCV 生成ユースケース
+    │   │       ├── indicator_calculator.py  # 指標計算ユースケース
+    │   │       └── signal_generator.py  # シグナル生成ユースケース
+    │   ├── interfaces/        # インターフェース定義（モジュール固有のみ）
+    │   │   ├── __init__.py
+    │   │   └── strategy.py   # Strategy インターフェース（モジュール固有）
+    │   │   ├── ohlcv_repository.py  # OHLCV リポジトリインターフェース
+    │   │   └── signal_repository.py  # Signal リポジトリインターフェース
+    │   └── services/         # アプリケーションサービス
     │       ├── __init__.py
-    │       ├── redis/             # Redis 接続
-    │       │   ├── __init__.py
-    │       │   ├── consumer.py   # Redis Stream Consumer
-    │       │   └── publisher.py  # Redis Stream Publisher
-    │       ├── database/          # PostgreSQL 接続
-    │       │   ├── __init__.py
-    │       │   ├── connection.py  # DB 接続管理
-    │       │   ├── schema.py      # SQLAlchemy モデル定義
-    │       │   ├── repositories/  # リポジトリ実装
-    │       │   │   ├── __init__.py
-    │       │   │   ├── ohlcv_repository.py
-    │       │   │   └── signal_repository.py
-    │       │   └── migrations/    # Alembic マイグレーション
-    │       ├── strategies/        # 戦略実装（インフラ層として扱う）
-    │       │   ├── __init__.py
-    │       │   ├── base.py        # Strategy 基底クラス
-    │       │   └── moving_average_cross.py
-    │       └── logger/            # ログ実装
-    │           ├── __init__.py
-    │           └── db_logger.py  # DBLogger 実装
+    │       └── signal_publisher.py  # シグナル配信サービス
+    │
+    └── infrastructure/         # インフラ層: 外部システム連携
+        ├── __init__.py
+        ├── redis/             # Redis 接続
+        │   ├── __init__.py
+        │   ├── consumer.py   # Redis Stream Consumer
+        │   └── publisher.py  # Redis Stream Publisher
+        ├── database/          # PostgreSQL 接続
+        │   ├── __init__.py
+        │   ├── connection.py  # DB 接続管理
+        │   ├── schema.py      # SQLAlchemy モデル定義
+        │   ├── repositories/  # リポジトリ実装
+        │   │   ├── __init__.py
+        │   │   ├── ohlcv_repository.py
+        │   │   └── signal_repository.py
+        │   └── migrations/    # Alembic マイグレーション
+        ├── strategies/        # 戦略実装（インフラ層として扱う）
+        │   ├── __init__.py
+        │   ├── base.py        # Strategy 基底クラス
+        │   └── moving_average_cross.py
+        └── logger/            # ログ実装
+            ├── __init__.py
+            └── db_logger.py  # DBLogger 実装
     │
     ├── tests/
     │   ├── __init__.py
@@ -652,8 +655,8 @@ class MovingAverageCrossStrategy(Strategy):
 **Infrastructure 層から Domain 層への依存**:
 ```python
 # infrastructure/database/repositories/signal_repository.py
-from application.interfaces.signal_repository import SignalRepository
-from domain.models.signal import Signal
+from shared.application.interfaces.signal_repository import SignalRepository
+from shared.domain.models import Signal
 
 class SignalRepositoryImpl(SignalRepository):
     def save(self, signal: Signal) -> None:

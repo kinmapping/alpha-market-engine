@@ -153,12 +153,16 @@ for message in redis_consumer.consume(
 - Infrastructure 層が実装すべきインターフェースを定義
 - 依存性逆転の原則（DIP）を実現
 
-**配置**: `application/interfaces/`
+**配置**:
+- **共有インターフェース**: `shared/application/interfaces/`（`ohlcv_repository.py`, `signal_repository.py`）
+- **モジュール固有インターフェース**: `application/interfaces/`（`order_repository.py`, `position_repository.py`, `execution_repository.py`）
 
 **主要インターフェース**:
-- `order_repository.py`: Order リポジトリインターフェース
-- `position_repository.py`: Position リポジトリインターフェース
-- `execution_repository.py`: Execution リポジトリインターフェース
+- `order_repository.py`: Order リポジトリインターフェース（モジュール固有）
+- `position_repository.py`: Position リポジトリインターフェース（モジュール固有）
+- `execution_repository.py`: Execution リポジトリインターフェース（モジュール固有）
+- `signal_repository.py`: Signal リポジトリインターフェース（`shared/application/interfaces/` から共有、必要に応じて使用）
+- `ohlcv_repository.py`: OHLCV リポジトリインターフェース（`shared/application/interfaces/` から共有、必要に応じて使用）
 
 ### Infrastructure 層のコンポーネント
 
@@ -293,10 +297,10 @@ class GmoOrderExecutor:
     async def execute(self, signal: Signal) -> Order:
         # シグナルから注文パラメータを生成
         order_params = self._build_order_params(signal)
-        
+
         # REST API で注文発行
         response = await self.client.place_order(order_params)
-        
+
         # Order エンティティに変換
         return Order(
             exchange=signal.exchange,

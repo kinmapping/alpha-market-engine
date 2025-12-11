@@ -321,7 +321,7 @@ ws-collector-node:
 
 strategy-module:
   build:
-    context: ./services/strategy-module
+    context: ./services/strategy_module
     dockerfile: Dockerfile
   container_name: strategy-module
   restart: unless-stopped
@@ -423,53 +423,56 @@ alpha-market-engine/
 │   │   └── env.example
 │   │
 │   ├── shared/                       # 共有コード（strategy-module と execution-module で共有）
-│   │   └── domain/
-│   │       └── models/               # 共有エンティティクラス
+│   │   ├── domain/
+│   │   │   └── models/               # 共有エンティティクラス
+│   │   │       ├── __init__.py
+│   │   │       ├── ohlcv.py         # OHLCV エンティティ（両方で使用）
+│   │   │       ├── signal.py        # Signal エンティティ（両方で使用）
+│   │   │       ├── order.py         # Order エンティティ（両方で使用）
+│   │   │       ├── execution.py     # Execution エンティティ（両方で使用）
+│   │   │       └── position.py      # Position エンティティ（両方で使用）
+│   │   └── application/
+│   │       └── interfaces/           # 共有リポジトリインターフェース
 │   │           ├── __init__.py
-│   │           ├── ohlcv.py         # OHLCV エンティティ（両方で使用）
-│   │           ├── signal.py        # Signal エンティティ（両方で使用）
-│   │           ├── order.py         # Order エンティティ（両方で使用）
-│   │           ├── execution.py     # Execution エンティティ（両方で使用）
-│   │           └── position.py      # Position エンティティ（両方で使用）
+│   │           ├── ohlcv_repository.py    # OHLCV リポジトリインターフェース（両方で使用）
+│   │           └── signal_repository.py   # Signal リポジトリインターフェース（両方で使用）
 │   │
-│   ├── strategy-module/
-│   │   ├── strategy_engine/
-│   │   │   ├── __init__.py
-│   │   │   ├── config.py
-│   │   │   ├── main.py
-│   │   │   ├── domain/              # ドメイン層
-│   │   │   │   ├── models/          # モジュール固有のエンティティクラス（現時点では空）
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── entities/
-│   │   │   │   └── value_objects/
-│   │   │   ├── application/         # アプリケーション層
-│   │   │   │   ├── usecases/        # ユースケース
-│   │   │   │   │   └── strategy/    # Strategy ユースケース
-│   │   │   │   │       ├── main.py
-│   │   │   │   │       ├── ohlcv_generator.py
-│   │   │   │   │       ├── indicator_calculator.py
-│   │   │   │   │       └── signal_generator.py
-│   │   │   │   ├── interfaces/      # インターフェース定義
-│   │   │   │   │   ├── strategy.py
-│   │   │   │   │   ├── ohlcv_repository.py
-│   │   │   │   │   └── signal_repository.py
-│   │   │   │   └── services/       # アプリケーションサービス
-│   │   │   │       └── signal_publisher.py
-│   │   │   └── infrastructure/      # インフラ層
-│   │   │       ├── redis/           # Redis 接続
-│   │   │       │   ├── consumer.py
-│   │   │       │   └── publisher.py
-│   │   │       ├── database/        # PostgreSQL 接続
-│   │   │       │   ├── connection.py
-│   │   │       │   ├── schema.py
-│   │   │       │   └── repositories/
-│   │   │       │       ├── ohlcv_repository.py
-│   │   │       │       └── signal_repository.py
-│   │   │       ├── strategies/      # 戦略実装
-│   │   │       │   ├── base.py
-│   │   │       │   └── moving_average_cross.py
-│   │   │       └── logger/          # ログ実装
-│   │   │           └── db_logger.py
+│   ├── strategy_module/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   ├── domain/              # ドメイン層
+│   │   │   ├── models/          # モジュール固有のエンティティクラス（現時点では空）
+│   │   │   │   └── __init__.py
+│   │   │   ├── entities/
+│   │   │   └── value_objects/
+│   │   ├── application/         # アプリケーション層
+│   │   │   ├── usecases/        # ユースケース
+│   │   │   │   └── strategy/    # Strategy ユースケース
+│   │   │   │       ├── main.py
+│   │   │   │       ├── ohlcv_generator.py
+│   │   │   │       ├── indicator_calculator.py
+│   │   │   │       └── signal_generator.py
+│   │   │   ├── interfaces/      # インターフェース定義（モジュール固有のみ）
+│   │   │   │   └── strategy.py  # Strategy インターフェース（モジュール固有）
+│   │   │   │   # ohlcv_repository.py と signal_repository.py は shared/application/interfaces/ から共有
+│   │   │   └── services/       # アプリケーションサービス
+│   │   │       └── signal_publisher.py
+│   │   └── infrastructure/      # インフラ層
+│   │       ├── redis/           # Redis 接続
+│   │       │   ├── consumer.py
+│   │       │   └── publisher.py
+│   │       ├── database/        # PostgreSQL 接続
+│   │       │   ├── connection.py
+│   │       │   ├── schema.py
+│   │       │   └── repositories/
+│   │       │       ├── ohlcv_repository.py
+│   │       │       └── signal_repository.py
+│   │       ├── strategies/      # 戦略実装
+│   │       │   ├── base.py
+│   │       │   └── moving_average_cross.py
+│   │       └── logger/          # ログ実装
+│   │           └── db_logger.py
 │   │   ├── Dockerfile
 │   │   ├── pyproject.toml
 │   │   └── .env.example
@@ -541,13 +544,29 @@ strategy-module と execution-module で使用するエンティティクラス�
 **モジュール固有エンティティ**:
 - 現時点では、すべてのエンティティを `shared/` 配下で共有しています
 
+#### 共有リポジトリインターフェースの配置
+
+同じエンティティを扱うリポジトリインターフェースも `shared/application/interfaces/` 配下で共有します。
+
+**配置場所**: `shared/application/interfaces/`
+
+**共有インターフェース**:
+- `ohlcv_repository.py`: OHLCV リポジトリインターフェース（両モジュールで使用）
+- `signal_repository.py`: Signal リポジトリインターフェース（両モジュールで使用）
+
+**モジュール固有インターフェース**:
+- `strategy.py`: Strategy インターフェース（strategy-module のみ）
+- `order_repository.py`: Order リポジトリインターフェース（execution-module のみ）
+- `position_repository.py`: Position リポジトリインターフェース（execution-module のみ）
+- `execution_repository.py`: Execution リポジトリインターフェース（execution-module のみ）
+
 #### インポート方法
 
 各モジュールから共有エンティティをインポートする際は、`PYTHONPATH` に `shared/` を追加するか、相対パスで参照します。
 
 **例: strategy-module からのインポート**:
 ```python
-# strategy-module/strategy_engine/application/usecases/strategy/signal_generator.py
+# strategy_module/application/usecases/strategy/signal_generator.py
 import sys
 from pathlib import Path
 
@@ -557,6 +576,8 @@ sys.path.insert(0, str(shared_path))
 
 from domain.models.signal import Signal
 from domain.models.ohlcv import OHLCV  # 共有エンティティ
+from application.interfaces.signal_repository import SignalRepository  # 共有インターフェース
+from application.interfaces.ohlcv_repository import OhlcvRepository  # 共有インターフェース
 ```
 
 **例: execution-module からのインポート**:
@@ -571,6 +592,7 @@ sys.path.insert(0, str(shared_path))
 
 from domain.models.signal import Signal
 from domain.models.order import Order
+from application.interfaces.signal_repository import SignalRepository  # 共有インターフェース（必要に応じて）
 ```
 
 #### Docker 環境での共有方法
@@ -579,7 +601,7 @@ Docker 環境では、`shared/` ディレクトリを各モジュールのコン
 
 **方法1: Dockerfile で COPY（推奨）**:
 ```dockerfile
-# strategy-module/Dockerfile
+# strategy_module/Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -601,7 +623,7 @@ CMD ["python", "-m", "strategy_engine.main"]
 strategy-module:
   build:
     context: .
-    dockerfile: services/strategy-module/Dockerfile
+    dockerfile: services/strategy_module/Dockerfile
   volumes:
     - ./shared:/app/shared:ro  # 読み取り専用でマウント
   environment:
