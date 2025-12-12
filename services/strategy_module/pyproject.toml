@@ -2,8 +2,16 @@
 name = "strategy-module"
 version = "0.1.0"
 description = "Strategy module worker for market data consumption and signal generation."
-requires-python = ">=3.11"
-dependencies = ["redis[hiredis]>=5.0.8", "pydantic>=2.9.0"]
+requires-python = ">=3.14"
+dependencies = [
+  "redis[hiredis]>=5.0.8",
+  "pydantic>=2.9.0",
+  "pandas>=2.0.0",
+  "pandas-ta>=0.3.14b0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0", "pytest-asyncio>=0.21.0"]
 
 [build-system]
 requires = ["setuptools>=68.0"]
@@ -12,3 +20,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["application*", "infrastructure*", "domain*", "config", "main"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
