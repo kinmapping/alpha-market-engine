@@ -57,17 +57,22 @@ class RedisStreamConsumer:
 
         for stream_name in streams.keys():
             try:
+                # "$" を使用して、最新のメッセージ以降から読み始める
+                # これにより、既存のメッセージが pending リストに追加されない
                 await self.redis.xgroup_create(
                     name=stream_name,
                     groupname=group_name,
-                    id="0",
+                    id="$",  # 最新のメッセージ以降から読み始める
                     mkstream=mkstream,
                 )
                 logger.info("Created consumer group: %s for stream: %s", group_name, stream_name)
             except aioredis.ResponseError as e:
                 # Consumer Group が既に存在する場合は無視
                 if "BUSYGROUP" in str(e):
-                    logger.debug("Consumer group already exists: %s for stream: %s", group_name, stream_name)
+                    logger.info("Consumer group already exists: %s for stream: %s", group_name, stream_name)
+                    # 既存の Consumer Group の場合、pending メッセージを確認
+                    # 注意: 既存の pending メッセージは自動的には削除されません
+                    # 必要に応じて、XCLAIM や XACK で処理する必要があります
                 else:
                     raise
 
@@ -134,6 +139,24 @@ class RedisStreamConsumer:
                 logger.error("Error consuming from Redis Stream: %s", e, exc_info=True)
                 # エラー時は少し待機してから再試行
                 await asyncio.sleep(1)
+
+    async def ack(self, stream_name: str, group_name: str, message_id: str) -> None:
+        """メッセージの処理完了を通知します（ACK）。
+
+        Args:
+            stream_name: Stream 名（例: "md:ticker"）
+            group_name: Consumer Group 名（例: "strategy-module"）
+            message_id: メッセージID（例: "1734123456789-0"）
+        """
+        if not self.redis:
+            await self.connect()
+
+        try:
+            result = await self.redis.xack(stream_name, group_name, message_id)
+            logger.debug("ACKed message: stream=%s, message_id=%s, result=%s", stream_name, message_id, result)
+        except Exception as e:
+            logger.error("Error ACKing message %s from stream %s: %s", message_id, stream_name, e, exc_info=True)
+            raise
 
     def stop(self) -> None:
         """購読を停止します。"""

@@ -11,9 +11,10 @@ from typing import Any
 
 from config import Settings, load_settings
 
-# shared/ を PYTHONPATH に追加
+# shared/ を PYTHONPATH に追加（strategy_module の後に追加）
 shared_path = Path(__file__).parent.parent / "shared"
-sys.path.insert(0, str(shared_path))
+if str(shared_path) not in sys.path:
+    sys.path.append(str(shared_path))
 
 from application.services.signal_publisher import SignalPublisherService
 from application.usecases.strategy.indicator_calculator import IndicatorCalculatorUseCase
@@ -96,6 +97,12 @@ async def run_worker(settings: Settings) -> None:
                 # OHLCV 生成
                 ohlcv = ohlcv_generator.execute(message)
                 if not ohlcv:
+                    # OHLCV が生成されない場合でも ACK を送信（無効なメッセージとして処理済み）
+                    await redis_consumer.ack(
+                        stream_name=message["stream"],
+                        group_name="strategy-module",
+                        message_id=message["id"],
+                    )
                     continue
 
                 # 指標計算
@@ -115,8 +122,26 @@ async def run_worker(settings: Settings) -> None:
                         except Exception as e:
                             logger.error("Failed to save signal: %s", e, exc_info=True)
 
+                # メッセージ処理完了を通知（ACK）
+                await redis_consumer.ack(
+                    stream_name=message["stream"],
+                    group_name="strategy-module",
+                    message_id=message["id"],
+                )
+
             except Exception as e:
                 logger.error("Error processing message: %s", e, exc_info=True)
+                # エラーが発生した場合でも ACK を送信（無限ループを防ぐため）
+                # 注意: エラー時に ACK を送信すると、そのメッセージは再処理されません
+                # 再処理が必要な場合は、ACK を送信せずに continue する
+                try:
+                    await redis_consumer.ack(
+                        stream_name=message["stream"],
+                        group_name="strategy-module",
+                        message_id=message["id"],
+                    )
+                except Exception as ack_error:
+                    logger.error("Failed to ACK message after error: %s", ack_error, exc_info=True)
                 continue
 
     except KeyboardInterrupt:
