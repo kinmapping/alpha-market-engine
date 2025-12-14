@@ -6,6 +6,8 @@ WORKDIR /app
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # 共有エンティティをコピー（プロジェクトルートの shared/ から）
