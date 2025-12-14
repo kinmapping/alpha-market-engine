@@ -78,6 +78,8 @@ export class GmoAdapter implements MarketDataAdapter {
       // 標準の WebSocket API では Event を返す
       // エラーの詳細は Event オブジェクトからは取得できないため、イベント自体をログに記録
       console.error(`[GmoAdapter] socket error for ${this.symbol}:`, event);
+      // エラー発生時も再接続をスケジュール（close イベントが必ず発生するとは限らないため）
+      this.reconnectManager.scheduleReconnect();
     });
   }
 
