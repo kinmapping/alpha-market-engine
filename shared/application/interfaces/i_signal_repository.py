@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from shared.domain.models import Signal
 
 
-class SignalRepository(ABC):
+class ISignalRepository(ABC):
     @abstractmethod
-    def save(self, signal: Signal) -> None:
+    async def save(self, signal: Signal) -> None:
         """Persist Signal."""
 

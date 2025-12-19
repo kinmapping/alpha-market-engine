@@ -1,7 +1,7 @@
 """Shared repository interfaces."""
 
-from .ohlcv_repository import OhlcvRepository
-from .signal_repository import SignalRepository
+from .i_ohlcv_repository import IOhlcvRepository
+from .i_signal_repository import ISignalRepository
 
-__all__ = ["OhlcvRepository", "SignalRepository"]
+__all__ = ["IOhlcvRepository", "ISignalRepository"]
 
