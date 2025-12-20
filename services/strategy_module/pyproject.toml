@@ -7,7 +7,10 @@ dependencies = [
   "redis[hiredis]>=7.1.0",
   "pydantic>=2.12.0",
   "pandas>=2.3.0",
-  "numpy>=2.0.0",          # テクニカル指標計算用（pandas-ta の代替）
+  "numpy>=2.0.0",               # テクニカル指標計算用（pandas-ta の代替）
+  "asyncpg>=0.31.0",            # PostgreSQL 非同期ドライバ（SQLAlchemy のドライバとして使用）
+  "sqlalchemy[asyncio]>=2.0.0", # SQLAlchemy Core + async サポート
+  "alembic>=1.13.0",            # マイグレーションツール
 ]
 
 [project.optional-dependencies]
