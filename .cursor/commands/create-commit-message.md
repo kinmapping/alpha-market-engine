@@ -30,15 +30,51 @@
 
 ## コミットメッセージの形式
 
-Conventional Commits 形式を推奨：
-- `feat: 新機能の追加`
-- `fix: バグ修正`
-- `test: テストの追加・修正`
-- `refactor: リファクタリング`
-- `docs: ドキュメントの更新`
-- `chore: その他の変更`
+### 参考
+[Semantic Commit Message](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716)
 
-日本語でのコミットメッセージも対応可能です。
+### フォーマット
+Conventional Commits 形式をもとに1行目は以下のフォーマットを使用してください。
+日本語でのコミットメッセージを作成してください。
+フォーマット: `<Type>(<Scope>): <Emoji> #<IssueNumber> <Subject>`
+
+**`<Type>`**
+
+|Type| 説明|
+|---|---|
+|feat|ユーザーにとっては新しい機能であり、ビルド スクリプトにとっては新しい機能ではありません|
+|fix|ビルド スクリプトの修正ではなく、ユーザー向けのバグ修正|
+|docs|ドキュメントの変更|
+|style|フォーマット、セミコロンの欠落など。製品コードの変更はありません|
+|refactor|プロダクションコードのリファクタリング、例: 変数名の変更|
+|test|不足しているテストの追加、テストのリファクタリング。本番環境のコード変更はなし|
+|chore|タスクファイルなど本番環境に影響のない修正|
+
+**`<Scope>`**
+
+省略は可能です。変更箇所の特定、粒度を決める役割です。
+例えば、
+- login: ログイン機能
+- api: API 機能追加
+- auth: 認証機能
+- ui: フロントエンドの修正
+など
+
+**`<Emoji>`**
+
+Typeをより"カラフル"にするためにEmojiを書きます
+何でも構いませんが[gitmoji](https://gitmoji.dev/)から選ぶのが便利だと思います
+ただし、Emojiを覚えるコストがあるので必須ではありません
+
+**`<IssueNumber>`**
+
+コミットに紐づく Issue 番号を記載する。Issue を作っていなければ省略可
+
+
+**`<Subject>`**
+
+いわゆる変更内容を書く。現在型で「◯◯した」ではなく「◯◯する」と書く。
+文字数は特に制限はないが、20 ~ 30 文字以内が適切だと思います。
 
 ## 実装の詳細
 
@@ -55,10 +91,10 @@ git diff --cached --name-only
 ステージング内容を確認しました。以下のコミットメッセージ候補を提案します：
 
 [1] 簡潔版（1行）
-    例: test: Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理
+    例: test(infrastructure): 🧪 Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理する
 
 [2] 詳細版（複数行）
-    例: test: Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理
+    例: test(infrastructure): 🧪 Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理する
 
     新規追加:
     - GmoWebSocketClient.test.ts (14 tests)
@@ -70,6 +106,8 @@ git diff --cached --name-only
     - tests/README.md を更新
 
 [3] その他の候補（必要に応じて）
+    例: test(infrastructure): Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理する
+    （Emoji省略版）
 
 どの候補を使用しますか？番号を指定するか、直接編集したメッセージを提供してください。
 ```
@@ -94,9 +132,9 @@ AI: ステージング内容を確認中...
 
     コミットメッセージ候補:
 
-    [1] test: Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理
+    [1] test(infrastructure): 🧪 Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理する
 
-    [2] test: Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理
+    [2] test(infrastructure): 🧪 Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理する
 
         新規追加:
         - GmoWebSocketClient.test.ts (14 tests)
@@ -112,7 +150,7 @@ AI: ステージング内容を確認中...
 ユーザー: 2
 
 AI: [2] のメッセージでコミットを実行します...
-    git commit -m "test: Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理..."
+    git commit -m "test(infrastructure): 🧪 Infrastructure層のユニットテストを追加し、ディレクトリ構造を整理する..."
 
     コミットが完了しました。
 ```

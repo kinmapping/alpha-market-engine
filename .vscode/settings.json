@@ -10,6 +10,43 @@
       "statusBar.noFolderBackground": "#242424"
     }
   },
+  "editor.tokenColorCustomizations": {
+    "[Default Dark+]": {
+      "textMateRules": [
+        {
+          "scope": [
+            "string.quoted.triple.double.python",
+            "string.quoted.triple.single.python",
+            "string.quoted.triple.python",
+            "string.quoted.double.shell"
+          ],
+          "settings": {
+            "foreground": "#6A9BD5",
+            "fontStyle": "italic"
+          }
+        },
+        {
+          "scope": "string.quoted.double.python",
+          "settings": {
+            "foreground": "#c370d2"
+          }
+        },
+        {
+          "scope": "string.quoted.single.python",
+          "settings": {
+            "foreground": "#afa038"
+          }
+        }
+      ]
+    }
+  },
+  "editor.semanticTokenColorCustomizations": {
+    "[Default Dark+]": {
+      "rules": {
+        "string": "#6A9BD5"
+      }
+    }
+  },
   "markdown.previewFrontMatter": "show",
   "todohighlight.isEnable": true,
   "todohighlight.isCaseSensitive": true,
@@ -138,10 +175,14 @@
   "todohighlight.maxFilesForSearch": 5120,
   "todohighlight.toggleURI": false,
   "cSpell.words": [
+    "abstractmethod",
     "appendonly",
     "biomejs",
+    "dataclass",
+    "dataclasses",
     "dotenv",
     "exitcode",
+    "getenv",
     "huskyrc",
     "ioredis",
     "klines",
@@ -150,7 +191,13 @@
     "ohlcv",
     "orderbooks",
     "pycache",
+    "pydantic",
+    "pyproject",
+    "PYTHONPATH",
+    "setuptools",
     "trixie",
+    "usecases",
+    "VARCHAR",
     "venv",
     "vitest",
     "websocket",
