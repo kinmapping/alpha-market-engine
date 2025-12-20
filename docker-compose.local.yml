@@ -26,9 +26,10 @@ services:
       - redis
     networks:
       - bot-net
-    # volumes:
-    #   - ./services/ws-collector:/app
-    # command: ["python", "-m", "ws_collector.main"]
+    volumes:
+      - ./services/ws-collector-node/src:/app/src  # ソースコードをマウント
+      - ./services/ws-collector-node/tsconfig.json:/app/tsconfig.json
+    command: ["npm", "run", "dev"]  # tsx watch を使用
 
   # 2) RESTで残高/注文照会/過去OHLCVなど
   # rest-client:
@@ -66,15 +67,16 @@ services:
       - ./services/strategy_module/.env  # strategy-module 固有の環境変数（STRATEGY_NAME など）
     environment:
       # 環境変数のデフォルト値（env_file で上書き可能）
-      SYMBOLS: ${SYMBOLS:-BTC_JPY,ETH_JPY}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      DATABASE_URL: ${DATABASE_URL:-}
-      STRATEGY_NAME: ${STRATEGY_NAME:-moving_average_cross}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      ENABLE_HTTP: ${ENABLE_HTTP:-false}
-      HTTP_PORT: ${HTTP_PORT:-8000}
+      SYMBOLS: ${SYMBOLS}
+      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      STRATEGY_NAME: ${STRATEGY_NAME}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ENABLE_HTTP: ${ENABLE_HTTP}
+      HTTP_PORT: ${HTTP_PORT}
     depends_on:
       - redis
+      - db
     networks:
       - bot-net
 
@@ -103,6 +105,22 @@ services:
     # networks:
     #   - bot-net
 
+  # 5) データベース（PostgreSQL）
+  db:
+    image: postgres:16-alpine
+    container_name: db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    networks:
+      - bot-net
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
   # 6) 低遅延メッセージング/キュー
   redis:
     image: redis:8.4.0-alpine
@@ -116,16 +134,10 @@ services:
       - redis-data:/data
     command: ["redis-server", "--appendonly", "yes"]
 
-  # 以下のサービスは今回の最小構成では不要なためコメントアウト
-  # rest-client:
-  # strategy-engine:
-  # execution-engine:
-  # db:
-
 networks:
   bot-net:
     driver: bridge
 
 volumes:
-  # db-data:
+  db-data:
   redis-data:

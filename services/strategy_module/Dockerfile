@@ -13,6 +13,10 @@ RUN apt-get update && apt-get upgrade -y && \
 # 共有エンティティをコピー（プロジェクトルートの shared/ から）
 COPY shared/ /app/shared/
 
+# Alembic をコピー（マイグレーション実行用）
+COPY alembic/ /app/alembic/
+COPY alembic.ini /app/alembic.ini
+
 # モジュール固有のコードをコピー
 COPY services/strategy_module/ /app/strategy_module/
 
@@ -26,6 +30,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # PYTHONPATH に shared/ を追加（strategy_module から shared を参照可能にする）
 ENV PYTHONPATH=/app:/app/shared
 
-# メインエントリーポイントを実行
-CMD ["python", "main.py"]
+# 起動スクリプトをコピー
+COPY services/strategy_module/shells/start.sh /app/shells/start.sh
+RUN chmod +x /app/shells/start.sh
+
+# 起動スクリプトを実行
+CMD ["/app/shells/start.sh"]
 
