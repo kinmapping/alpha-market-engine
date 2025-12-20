@@ -16,5 +16,5 @@ else
 fi
 
 echo "Starting strategy module..."
-cd /app/strategy_module
+cd /app/strategy
 exec python main.py

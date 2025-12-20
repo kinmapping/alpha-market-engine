@@ -42,7 +42,7 @@
 本プロジェクトでは、**サービス間のメッセージング**（イベントバス）として Redis を使用しています。
 
 **具体的な用途**:
-- **ws-collector-node** → **trading-engine (Strategy)**: 市場データ（ticker/orderbook/trade）を配信
+- **collector** → **trading-engine (Strategy)**: 市場データ（ticker/orderbook/trade）を配信
 - **trading-engine (Strategy)** → **trading-engine (Execution)**: シグナルを配信
 
 ### Redis を選ぶ理由
@@ -116,7 +116,7 @@ Stream: md:ticker
 
 ### メッセージの処理フロー
 
-1. **Producer（ws-collector-node）**: メッセージを Stream に追加（`XADD`）
+1. **Producer（collector）**: メッセージを Stream に追加（`XADD`）
 2. **Consumer（trading-engine-strategy）**: Consumer Group でメッセージを取得（`XREADGROUP`）
 3. **ACK**: 処理完了を通知（`XACK`）
 4. **再取得**: 未ACKのメッセージを再取得可能（`XREADGROUP` with `>`）
@@ -264,7 +264,7 @@ trading-engine-strategy (Consumer Group で購読)
 
 ## 実装例と使い方
 
-### Producer 側（ws-collector-node）
+### Producer 側（collector）
 
 ```typescript
 // RedisPublisher を使用してメッセージを配信

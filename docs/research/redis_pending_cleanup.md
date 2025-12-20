@@ -15,17 +15,17 @@ Consumer Group を使用している場合、処理されなかったメッセ�
 
 ```bash
 # Pending メッセージ数を確認
-docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:ticker strategy-module
+docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:ticker strategy
 
 # 古い pending メッセージの詳細を確認
-docker-compose -f docker-compose.local.yml exec redis redis-cli XPENDING md:ticker strategy-module - + 10
+docker-compose -f docker-compose.local.yml exec redis redis-cli XPENDING md:ticker strategy - + 10
 ```
 
 ### Pending メッセージの内容確認
 
 ```bash
 # 特定のメッセージIDの詳細を確認
-docker-compose -f docker-compose.local.yml exec redis redis-cli XPENDING md:ticker strategy-module - + 10
+docker-compose -f docker-compose.local.yml exec redis redis-cli XPENDING md:ticker strategy - + 10
 ```
 
 ## 解決方法
@@ -36,13 +36,13 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli XPENDING md:tick
 
 ```bash
 # Consumer Group を削除
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:ticker strategy-module
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:orderbook strategy-module
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:trade strategy-module
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:ticker strategy
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:orderbook strategy
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:trade strategy
 
-# strategy-module を再起動（Consumer Group が自動的に再作成される）
+# strategy を再起動（Consumer Group が自動的に再作成される）
 # 注意: 現在の実装では id="$" を使用しているため、新しいメッセージのみを読み取る
-docker-compose -f docker-compose.local.yml restart strategy-module
+docker-compose -f docker-compose.local.yml restart strategy
 ```
 
 **注意**: 既存の pending メッセージは残り続けますが、新しいメッセージのみが処理されます。
@@ -54,15 +54,15 @@ docker-compose -f docker-compose.local.yml restart strategy-module
 # 注意: この方法はメッセージを再処理しません
 
 # または、Consumer Group を削除して再作成（すべての pending がクリアされる）
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:ticker strategy-module
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP CREATE md:ticker strategy-module $ MKSTREAM
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:ticker strategy
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP CREATE md:ticker strategy $ MKSTREAM
 ```
 
 ### オプション3: 古い Pending メッセージを再処理
 
 ```bash
 # XCLAIM を使用してメッセージを再処理キューに戻す
-docker-compose -f docker-compose.local.yml exec redis redis-cli XCLAIM md:ticker strategy-module strategy-1 0 1764090790374-0
+docker-compose -f docker-compose.local.yml exec redis redis-cli XCLAIM md:ticker strategy strategy-1 0 1764090790374-0
 ```
 
 ### オプション4: すべての Pending メッセージを ACK する（再処理不要な場合）
@@ -76,7 +76,7 @@ python3 << 'EOF'
 import redis
 r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 stream = 'md:ticker'
-group = 'strategy-module'
+group = 'strategy'
 consumer = 'strategy-1'
 
 # すべての pending メッセージを取得
@@ -98,13 +98,13 @@ EOF
 
 ```bash
 # Consumer Group を削除して再作成
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:ticker strategy-module
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:orderbook strategy-module
-docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:trade strategy-module
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:ticker strategy
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:orderbook strategy
+docker-compose -f docker-compose.local.yml exec redis redis-cli XGROUP DESTROY md:trade strategy
 
-# strategy-module を再起動（Consumer Group が自動的に再作成される）
+# strategy を再起動（Consumer Group が自動的に再作成される）
 # 注意: id="$" を使用しているため、新しいメッセージのみを読み取る
-docker-compose -f docker-compose.local.yml restart strategy-module
+docker-compose -f docker-compose.local.yml restart strategy
 ```
 
 ### 本番環境での推奨方法
@@ -134,7 +134,7 @@ docker-compose -f docker-compose.local.yml restart strategy-module
 
 ```bash
 # 単一の Stream の pending メッセージを ACK
-./scripts/clear_redis_pending.sh md:ticker strategy-module ack-all
+./scripts/clear_redis_pending.sh md:ticker strategy ack-all
 
 # すべての Stream の pending メッセージを ACK
 ./scripts/clear_redis_pending.sh '' '' ack-all-streams
@@ -143,24 +143,24 @@ docker-compose -f docker-compose.local.yml restart strategy-module
 **実行例**:
 ```bash
 # md:ticker の pending メッセージを確認
-./scripts/clear_redis_pending.sh md:ticker strategy-module check
+./scripts/clear_redis_pending.sh md:ticker strategy check
 
 # md:ticker の pending メッセージをすべて ACK
-./scripts/clear_redis_pending.sh md:ticker strategy-module ack-all
+./scripts/clear_redis_pending.sh md:ticker strategy ack-all
 
 # 確認: pending メッセージ数が 0 になっていることを確認
-./scripts/clear_redis_pending.sh md:ticker strategy-module check
+./scripts/clear_redis_pending.sh md:ticker strategy check
 ```
 
 ### 方法2: Python スクリプトを直接実行する
 
 ```bash
-# strategy-module コンテナ内で実行
-docker-compose -f docker-compose.local.yml exec strategy-module python3 - << 'EOF'
+# strategy コンテナ内で実行
+docker-compose -f docker-compose.local.yml exec strategy python3 - << 'EOF'
 import redis
 r = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 stream = 'md:ticker'
-group = 'strategy-module'
+group = 'strategy'
 
 pending = r.xpending_range(stream, group, min='-', max='+', count=100000)
 print(f"Found {len(pending)} pending messages. ACKing all...")
@@ -181,7 +181,7 @@ EOF
 ```bash
 # 注意: 大量のメッセージがある場合は時間がかかります
 # まず、pending メッセージ数を確認
-docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:ticker strategy-module
+docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:ticker strategy
 
 # すべての pending メッセージを取得して ACK（バッチ処理）
 # 注意: この方法は大量のメッセージがある場合に効率的です

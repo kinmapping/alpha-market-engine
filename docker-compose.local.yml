@@ -4,15 +4,15 @@ name: alpha-market-engine
 
 services:
   # 1) WebSocketで板/約定/ティッカーを常時取得して配信・保存する
-  ws-collector-node:
+  collector:
     build:
-      context: ./services/ws-collector-node
+      context: ./services/collector
       dockerfile: Dockerfile
-    container_name: ws-collector-node
+    container_name: collector
     restart: unless-stopped
     env_file:
       - .env
-      - ./services/ws-collector-node/.env
+      - ./services/collector/.env
     environment:
       # 必須環境変数（env_file またはホスト環境変数から取得）
       # 未設定の場合は main.ts の requireEnv() でエラーとなる
@@ -27,8 +27,8 @@ services:
     networks:
       - bot-net
     volumes:
-      - ./services/ws-collector-node/src:/app/src  # ソースコードをマウント
-      - ./services/ws-collector-node/tsconfig.json:/app/tsconfig.json
+      - ./services/collector/src:/app/src  # ソースコードをマウント
+      - ./services/collector/tsconfig.json:/app/tsconfig.json
     command: ["npm", "run", "dev"]  # tsx watch を使用
 
   # 2) RESTで残高/注文照会/過去OHLCVなど
@@ -56,15 +56,15 @@ services:
   #   command: ["python", "-m", "rest_client.main"]
 
   # 3) Redis/DBからデータ購読→戦略(シグナル)生成
-  strategy-module:
+  strategy:
     build:
       context: .
-      dockerfile: ./services/strategy_module/Dockerfile
-    container_name: strategy-module
+      dockerfile: ./services/strategy/Dockerfile
+    container_name: strategy
     restart: unless-stopped
     env_file:
       - .env
-      - ./services/strategy_module/.env  # strategy-module 固有の環境変数（STRATEGY_NAME など）
+      - ./services/strategy/.env  # strategy 固有の環境変数（STRATEGY_NAME など）
     environment:
       # 環境変数のデフォルト値（env_file で上書き可能）
       SYMBOLS: ${SYMBOLS}

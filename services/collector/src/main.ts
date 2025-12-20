@@ -58,7 +58,7 @@ async function bootstrap(): Promise<void> {
   await Promise.all(adapters.map((adapter) => adapter.start()));
 
   const shutdown = async () => {
-    console.log('Shutting down ws-collector-node...');
+    console.log('Shutting down collector...');
     // SIGINT/SIGTERM で全アダプタを切断し Redis クライアントも閉じる。
     for (const adapter of adapters) {
       adapter.disconnect();
@@ -72,6 +72,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((error) => {
-  console.error('Failed to bootstrap ws-collector-node:', error);
+  console.error('Failed to bootstrap collector:', error);
   process.exit(1);
 });

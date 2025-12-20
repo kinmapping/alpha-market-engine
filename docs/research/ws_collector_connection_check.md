@@ -1,6 +1,6 @@
-# ws-collector-node 接続確認方法
+# collector 接続確認方法
 
-ws-collector-node が GMO コインの WebSocket API に正常に接続し、データを Redis Stream に配信しているかを確認する方法。
+collector が GMO コインの WebSocket API に正常に接続し、データを Redis Stream に配信しているかを確認する方法。
 
 ## 目次
 
@@ -65,17 +65,17 @@ ws-collector-node が GMO コインの WebSocket API に正常に接続し、デ
 ### リアルタイムでログを監視
 
 ```bash
-docker-compose -f docker-compose.local.yml logs -f ws-collector-node
+docker-compose -f docker-compose.local.yml logs -f collector
 ```
 
 ### 最新のログを確認
 
 ```bash
 # 最新50行を確認
-docker-compose -f docker-compose.local.yml logs ws-collector-node --tail=50
+docker-compose -f docker-compose.local.yml logs collector --tail=50
 
 # 最新100行を確認
-docker-compose -f docker-compose.local.yml logs ws-collector-node --tail=100
+docker-compose -f docker-compose.local.yml logs collector --tail=100
 ```
 
 ### 成功のサイン
@@ -223,7 +223,7 @@ docker exec -it redis redis-cli XREAD BLOCK 0 STREAMS md:ticker md:orderbook md:
 
 ```bash
 # コンテナ内の環境変数を確認
-docker exec ws-collector-node printenv | grep -E "(WS_PUBLIC_URL|SYMBOLS|REDIS_URL|EXCHANGE_NAME)"
+docker exec collector printenv | grep -E "(WS_PUBLIC_URL|SYMBOLS|REDIS_URL|EXCHANGE_NAME)"
 ```
 
 **期待される結果**:
@@ -241,7 +241,7 @@ REDIS_URL=redis://redis:6379/0
 docker-compose -f docker-compose.local.yml ps
 
 # コンテナが起動しているか確認
-docker ps | grep ws-collector-node
+docker ps | grep collector
 ```
 
 ### Redis への接続確認
@@ -275,8 +275,8 @@ WS_PUBLIC_URL: ${WS_PUBLIC_URL:-wss://api.coin.z.com/ws/public/v1}
 # Redis の接続を確認
 docker exec redis redis-cli PING
 
-# ws-collector-node のログでエラーを確認
-docker-compose -f docker-compose.local.yml logs ws-collector-node
+# collector のログでエラーを確認
+docker-compose -f docker-compose.local.yml logs collector
 ```
 
 #### 3. Stream が存在しない
@@ -286,7 +286,7 @@ docker-compose -f docker-compose.local.yml logs ws-collector-node
 **解決方法**:
 ```bash
 # コンテナを再起動
-docker-compose -f docker-compose.local.yml restart ws-collector-node
+docker-compose -f docker-compose.local.yml restart collector
 
 # 数秒待ってから Stream を確認
 sleep 5
@@ -311,7 +311,7 @@ docker exec redis redis-cli KEYS "md:*"
 
 ## 参考資料
 
-- [ws-collector-node 設計](../architecture/02_ws_collector_node.md)
+- [collector 設計](../architecture/02_collector.md)
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/)
 - [Redis Streams ドキュメント](https://redis.io/docs/data-types/streams/)
 

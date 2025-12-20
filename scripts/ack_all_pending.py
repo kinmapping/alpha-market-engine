@@ -9,8 +9,8 @@ Usage:
     python3 scripts/ack_all_pending.py [STREAM_NAME] [GROUP_NAME]
 
 Examples:
-    python3 scripts/ack_all_pending.py md:ticker strategy-module
-    python3 scripts/ack_all_pending.py md:trade strategy-module
+    python3 scripts/ack_all_pending.py md:ticker strategy
+    python3 scripts/ack_all_pending.py md:trade strategy
 """
 
 import sys
@@ -28,7 +28,7 @@ def ack_all_pending(stream: str, group: str, redis_url: Optional[str] = None) ->
 
     Args:
         stream: Stream name (e.g., "md:ticker")
-        group: Consumer group name (e.g., "strategy-module")
+        group: Consumer group name (e.g., "strategy")
         redis_url: Redis connection URL (default: from REDIS_URL env var or redis://redis:6379/0)
 
     Returns:
@@ -91,7 +91,7 @@ def main():
         sys.exit(0)
 
     stream = sys.argv[1] if len(sys.argv) > 1 else "md:ticker"
-    group = sys.argv[2] if len(sys.argv) > 2 else "strategy-module"
+    group = sys.argv[2] if len(sys.argv) > 2 else "strategy"
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
     print(f"Stream: {stream}")

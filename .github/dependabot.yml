@@ -1,8 +1,8 @@
 version: 2
 updates:
-  # Node.js パッケージの自動更新（ws-collector-node）
+  # Node.js パッケージの自動更新（collector）
   - package-ecosystem: "npm"
-    directory: "/services/ws-collector-node"
+    directory: "/services/collector"
     schedule:
       interval: "weekly"
       day: "monday"

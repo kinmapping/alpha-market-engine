@@ -4,9 +4,9 @@
 # shellcheck source=/dev/null
 . "$(dirname -- "$0")/_/husky.sh"
 
-# ws-collector-node の TypeScript ファイルが変更された場合のみチェック
-if git diff --cached --name-only | grep -q 'services/ws-collector-node/.*\.ts$'; then
-  cd services/ws-collector-node || exit 1
+# collector の TypeScript ファイルが変更された場合のみチェック
+if git diff --cached --name-only | grep -q 'services/collector/.*\.ts$'; then
+  cd services/collector || exit 1
 
   # lint-staged を実行（変更されたファイルのみをチェック・自動修正）
   npx lint-staged

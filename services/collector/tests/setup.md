@@ -38,7 +38,7 @@ export REDIS_URL=redis://localhost:6379/0
 ### すべてのテストを実行
 
 ```bash
-cd services/ws-collector-node
+cd services/collector
 npm test
 ```
 

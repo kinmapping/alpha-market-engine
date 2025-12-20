@@ -40,6 +40,6 @@ alembic history
 ## 注意事項
 
 - マイグレーションは `shared/infrastructure/database/schema.py` の `metadata` を参照して生成されます
-- すべてのテーブル（strategy-module と execution-module の両方）が同じ metadata で管理されます
+- すべてのテーブル（strategy と execution の両方）が同じ metadata で管理されます
 - 外部キー制約があるため、マイグレーションの順序に注意してください
 

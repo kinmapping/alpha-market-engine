@@ -54,42 +54,42 @@ git diff --stat
 
 [1] Docker/インフラ関連
     ファイル:
-    - services/strategy_module/Dockerfile (新規)
+    - services/strategy/Dockerfile (新規)
     - docker-compose.local.yml (変更)
-    - services/strategy_module/env.example (新規)
+    - services/strategy/env.example (新規)
 
     説明: Docker コンテナの設定と環境変数管理
     推奨コミットタイプ: feat または chore
 
 [2] 実装コード（コア機能）
     ファイル:
-    - services/strategy_module/application/usecases/strategy/ohlcv_generator.py (変更)
-    - services/strategy_module/application/usecases/strategy/indicator_calculator.py (変更)
-    - services/strategy_module/application/usecases/strategy/signal_generator.py (変更)
-    - services/strategy_module/infrastructure/strategies/base.py (変更)
-    - services/strategy_module/infrastructure/strategies/moving_average_cross.py (変更)
-    - services/strategy_module/main.py (変更)
+    - services/strategy/application/usecases/strategy/ohlcv_generator.py (変更)
+    - services/strategy/application/usecases/strategy/indicator_calculator.py (変更)
+    - services/strategy/application/usecases/strategy/signal_generator.py (変更)
+    - services/strategy/infrastructure/strategies/base.py (変更)
+    - services/strategy/infrastructure/strategies/moving_average_cross.py (変更)
+    - services/strategy/main.py (変更)
 
     説明: OHLCV生成、指標計算、シグナル生成の実装
     推奨コミットタイプ: feat
 
 [3] テスト
     ファイル:
-    - services/strategy_module/tests/ (新規)
+    - services/strategy/tests/ (新規)
 
     説明: 統合テストの追加
     推奨コミットタイプ: test
 
 [4] ドキュメント
     ファイル:
-    - services/strategy_module/README.md (新規)
+    - services/strategy/README.md (新規)
 
     説明: セットアップと使用方法のドキュメント
     推奨コミットタイプ: docs
 
 [5] 設定ファイル
     ファイル:
-    - services/strategy_module/pyproject.toml (変更)
+    - services/strategy/pyproject.toml (変更)
 
     説明: 依存関係とパッケージ設定の更新
     推奨コミットタイプ: chore
@@ -111,23 +111,23 @@ git diff --stat
 
 ```bash
 # グループ1: Docker/インフラ関連
-git add services/strategy_module/Dockerfile
+git add services/strategy/Dockerfile
 git add docker-compose.local.yml
-git add services/strategy_module/env.example
+git add services/strategy/env.example
 
 # グループ2: 実装コード
-git add services/strategy_module/application/usecases/strategy/
-git add services/strategy_module/infrastructure/strategies/
-git add services/strategy_module/main.py
+git add services/strategy/application/usecases/strategy/
+git add services/strategy/infrastructure/strategies/
+git add services/strategy/main.py
 
 # グループ3: テスト
-git add services/strategy_module/tests/
+git add services/strategy/tests/
 
 # グループ4: ドキュメント
-git add services/strategy_module/README.md
+git add services/strategy/README.md
 
 # グループ5: 設定ファイル
-git add services/strategy_module/pyproject.toml
+git add services/strategy/pyproject.toml
 
 # グループ6: その他
 git add .vscode/settings.json
@@ -171,12 +171,12 @@ AI: 変更ファイルを確認中...
 ユーザー: 1,2
 
 AI: [1] と [2] をステージングします...
-    git add services/strategy_module/Dockerfile
+    git add services/strategy/Dockerfile
     git add docker-compose.local.yml
-    git add services/strategy_module/env.example
-    git add services/strategy_module/application/usecases/strategy/
-    git add services/strategy_module/infrastructure/strategies/
-    git add services/strategy_module/main.py
+    git add services/strategy/env.example
+    git add services/strategy/application/usecases/strategy/
+    git add services/strategy/infrastructure/strategies/
+    git add services/strategy/main.py
 
     ステージングが完了しました。
     ステージング内容:

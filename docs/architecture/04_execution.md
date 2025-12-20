@@ -1,6 +1,6 @@
 # Execution Module アーキテクチャ
 
-execution-module の設計と実装方針。Redis Stream からシグナルを購読し、リスク管理、注文実行、約定監視を行う。キューワーカーとして動作し、生成した注文・約定履歴を PostgreSQL に保存する。
+execution の設計と実装方針。Redis Stream からシグナルを購読し、リスク管理、注文実行、約定監視を行う。キューワーカーとして動作し、生成した注文・約定履歴を PostgreSQL に保存する。
 
 ## 目次
 
@@ -20,7 +20,7 @@ execution-module の設計と実装方針。Redis Stream からシグナルを�
 
 ### 責務
 
-execution-module は以下の責務を持つ:
+execution は以下の責務を持つ:
 
 - **シグナル購読**: Redis Stream からシグナルを購読（`signal:*`）を Consumer Group で購読（キューワーカーとして動作）
 - **リスク管理**: ポジションサイズ、ドローダウン、連続損失などのリスクチェック
@@ -35,7 +35,7 @@ execution-module は以下の責務を持つ:
 - **取りこぼしゼロ**: Consumer Group を使用して、再起動時もデータを取りこぼさない
 - **キューワーカーとして動作**: Redis Stream を購読してメッセージを処理するバックグラウンドワーカー
 - **リスク管理の徹底**: ポジションサイズ、ドローダウン、連続損失を厳格にチェック
-- **エンティティ共有**: strategy-module とエンティティクラス（モデル）を共有し、一貫性を保つ（`domain/models/`）
+- **エンティティ共有**: strategy とエンティティクラス（モデル）を共有し、一貫性を保つ（`domain/models/`）
 
 ---
 
@@ -44,16 +44,21 @@ execution-module は以下の責務を持つ:
 ### 全体フロー
 
 ```mermaid
-graph LR
-    Redis["<strong>Redis</strong><br/>(同一インスタンス)"]
+flowchart LR
+    Redis@{shape: das, label: "<br/><strong>Redis</strong><br/><br/>(同一インスタンス)"}
     Execution["<strong>Execution Module</strong><br/>リスク管理<br/>注文実行"]
-    GMO["<strong>GMO REST API</strong>"]
-    DB["<strong>PostgreSQL</strong><br/>注文 / 約定 / ポジション"]
+    GMO@{ shape: cloud, label: "<strong>GMO REST API</strong><br/>(Private API)" }
+    DB[("<strong>PostgreSQL</strong><br/>注文 / 約定 / ポジション")]
 
-    Redis -->|XREADGROUP<br/>購読<br/>signal:*| Execution
-    Execution -->|REST API<br/>注文| GMO
-    Execution <-->|注文と約定の保存<br/><br/>ポジション状態の読み取り| DB
+    Redis e1@==>|XREADGROUP<br/>購読<br/>signal:*| Execution
+    Execution e2@==>|REST API<br/>注文| GMO
+    Execution e3@<==>|注文と約定の保存<br/><br/>ポジション状態の読み取り| DB
+
+    e1@{ animate: true }
+    e2@{ animate: true }
+    e3@{ animate: true }
 ```
+
 
 ### Execution ユースケースのメインループ（Application 層）
 
@@ -80,7 +85,7 @@ order_executor = OrderExecutorUseCase(broker_client, order_repo)
 
 # Consumer Group でシグナルを購読
 for message in redis_consumer.consume(
-    group="execution-module",
+    group="execution",
     consumer="execution-1",
     streams={"signal:gmo": ">"}
 ):
@@ -126,12 +131,12 @@ for message in redis_consumer.consume(
 **配置**: `domain/models/`
 
 **主要エンティティ**:
-- `Signal`: シグナルのエンティティ（strategy-module と共有）
+- `Signal`: シグナルのエンティティ（strategy と共有）
 - `Order`: 注文のエンティティ
 - `Execution`: 約定のエンティティ
 - `Position`: ポジションのエンティティ
 
-**注意**: `Signal` エンティティは strategy-module でも使用されるため、`domain/models/` 配下で共有されます。
+**注意**: `Signal` エンティティは strategy でも使用されるため、`domain/models/` 配下で共有されます。
 
 ### Application 層のコンポーネント
 
@@ -446,11 +451,11 @@ CREATE INDEX idx_positions_exchange_symbol ON positions(exchange, symbol);
 
 ### レイヤードアーキテクチャ
 
-execution-module はレイヤードアーキテクチャを採用し、責務に基づいて層を分離します。
+execution はレイヤードアーキテクチャを採用し、責務に基づいて層を分離します。
 
 ```
 services/
-└── execution-module/
+└── execution/
     ├── execution_engine/
     │   ├── __init__.py
     │   ├── config.py              # 設定管理
@@ -609,7 +614,7 @@ class Order:
 
 ### 環境変数（.env）
 
-execution-module の設定は環境変数で管理する。
+execution の設定は環境変数で管理する。
 
 **必須設定**:
 ```env
@@ -676,7 +681,7 @@ class Config:
 
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/)
 - [architecture.md](./01_architecture.md) - システム全体のアーキテクチャ
-- [strategy-module 設計](./03_strategy_archi.md) - Strategy モジュールの設計
+- [strategy 設計](./03_strategy.md) - Strategy モジュールの設計
 - [trading_domain.md](../domain/trading_domain.md) - 取引ドメインのルール
 - [coding_standards.md](../coding_standards.md) - コード規約
 

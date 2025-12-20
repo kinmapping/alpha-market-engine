@@ -6,7 +6,7 @@
 ## 手順
 
 1. **package.json の依存関係を確認**
-   - `services/ws-collector-node/package.json` を読み込む
+   - `services/collector/package.json` を読み込む
    - `dependencies` と `devDependencies` のパッケージ名を抽出
    - 現在の `.github/dependabot.yml` の `groups` セクションと比較
 

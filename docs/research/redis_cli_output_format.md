@@ -15,7 +15,7 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli XINFO GROUPS md:
 **出力例**:
 ```
 1)  1) "name"
-    2) "strategy-module"
+    2) "strategy"
     3) "consumers"
     4) (integer) 1
     5) "pending"
@@ -49,7 +49,7 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli --json XINFO GRO
 
 **出力例**:
 ```json
-[{"name":"strategy-module","consumers":1,"pending":10189,"last-delivered-id":"1765640161811-0","entries-read":10211,"lag":0}]
+[{"name":"strategy","consumers":1,"pending":10189,"last-delivered-id":"1765640161811-0","entries-read":10211,"lag":0}]
 ```
 
 **特徴**:
@@ -80,7 +80,7 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli --raw XINFO GROU
 **出力例**:
 ```
 name
-strategy-module
+strategy
 consumers
 1
 pending

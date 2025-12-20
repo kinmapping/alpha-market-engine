@@ -48,7 +48,7 @@ class RedisStreamConsumer:
         """Consumer Group を作成します。
 
         Args:
-            group_name: Consumer Group 名（例: "strategy-module"）
+            group_name: Consumer Group 名（例: "strategy"）
             streams: Stream 名と開始位置の辞書（例: {"md:ticker": "0", "md:orderbook": "0"}）
             mkstream: Stream が存在しない場合に作成するかどうか
         """
@@ -87,7 +87,7 @@ class RedisStreamConsumer:
         """Redis Stream からメッセージを購読します。
 
         Args:
-            group_name: Consumer Group 名（例: "strategy-module"）
+            group_name: Consumer Group 名（例: "strategy"）
             consumer_name: Consumer 名（例: "strategy-1"）
             streams: Stream 名と開始位置の辞書（例: {"md:ticker": ">", "md:orderbook": ">"}）
             block: ブロック時間（ミリ秒、0 で非ブロッキング）
@@ -145,7 +145,7 @@ class RedisStreamConsumer:
 
         Args:
             stream_name: Stream 名（例: "md:ticker"）
-            group_name: Consumer Group 名（例: "strategy-module"）
+            group_name: Consumer Group 名（例: "strategy"）
             message_id: メッセージID（例: "1734123456789-0"）
         """
         if not self.redis:

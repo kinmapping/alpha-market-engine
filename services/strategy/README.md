@@ -15,7 +15,7 @@ Strategy module は、Redis Stream から市場データを購読し、OHLCV生�
 ### 依存関係のインストール
 
 ```bash
-cd services/strategy_module
+cd services/strategy
 pip install -e ".[dev]"
 ```
 
@@ -26,16 +26,16 @@ pip install -e ".[dev]"
 1. **プロジェクトルートの `.env`**（共有環境変数）
    - `REDIS_URL`, `LOG_LEVEL`, `SYMBOLS`, `DATABASE_URL` など、全サービスで共通の設定
 
-2. **`services/strategy_module/.env`**（strategy-module 固有の環境変数）
-   - `STRATEGY_NAME`, `ENABLE_HTTP`, `HTTP_PORT` など、strategy-module 固有の設定
+2. **`services/strategy/.env`**（strategy 固有の環境変数）
+   - `STRATEGY_NAME`, `ENABLE_HTTP`, `HTTP_PORT` など、strategy 固有の設定
 
 **セットアップ手順**:
 
 1. プロジェクトルートに共有環境変数ファイルを作成
 
 ```bash
-# strategy-module 固有の環境変数ファイルを作成
-cd services/strategy_module
+# strategy 固有の環境変数ファイルを作成
+cd services/strategy
 cp env.example .env
 # .env を編集して STRATEGY_NAME などを設定
 ```
@@ -56,16 +56,16 @@ python main.py
 
 ```bash
 # ビルドと起動
-docker-compose -f docker-compose.local.yml up --build strategy-module
+docker-compose -f docker-compose.local.yml up --build strategy
 
 # バックグラウンドで起動
-docker-compose -f docker-compose.local.yml up -d strategy-module
+docker-compose -f docker-compose.local.yml up -d strategy
 
 # ログ確認
-docker-compose -f docker-compose.local.yml logs -f strategy-module
+docker-compose -f docker-compose.local.yml logs -f strategy
 
 # 停止
-docker-compose -f docker-compose.local.yml stop strategy-module
+docker-compose -f docker-compose.local.yml stop strategy
 ```
 
 ### テストの実行
@@ -75,7 +75,7 @@ docker-compose -f docker-compose.local.yml stop strategy-module
 pytest tests/integration/ -v
 
 # Docker コンテナ内で実行
-docker-compose -f docker-compose.local.yml exec strategy-module pytest tests/integration/ -v
+docker-compose -f docker-compose.local.yml exec strategy pytest tests/integration/ -v
 ```
 
 ## アーキテクチャ
@@ -86,6 +86,6 @@ docker-compose -f docker-compose.local.yml exec strategy-module pytest tests/int
 - **Application 層**: ユースケース（OHLCV生成、指標計算、シグナル生成）
 - **Infrastructure 層**: Redis接続、データベース接続、戦略実装
 
-詳細は `docs/architecture/03_strategy_archi.md` を参照してください。
+詳細は `docs/architecture/03_strategy.md` を参照してください。
 
 

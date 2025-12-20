@@ -36,6 +36,13 @@
           "settings": {
             "foreground": "#afa038"
           }
+        },
+        {
+          "scope": "string.quoted.docstring.multi.python",
+          "settings": {
+            "foreground": "#787878", // 薄紫色に変更
+            "fontStyle": "italic" // さらに斜体にもできる
+          }
         }
       ]
     }

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class Database:
     """SQLAlchemy を使用した非同期データベース接続を管理するクラス。
 
-    すべてのモジュール（strategy-module, execution-module）で共有します。
+    すべてのモジュール（strategy, execution）で共有します。
     """
 
     def __init__(self, database_url: str) -> None:

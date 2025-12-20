@@ -11,7 +11,7 @@ from typing import Any
 
 from config import Settings, load_settings
 
-# shared/ を PYTHONPATH に追加（strategy_module の後に追加）
+# shared/ を PYTHONPATH に追加（strategy の後に追加）
 shared_path = Path(__file__).parent.parent / "shared"
 if str(shared_path) not in sys.path:
     sys.path.append(str(shared_path))
@@ -101,12 +101,12 @@ async def run_worker(settings: Settings) -> None:
         }
 
         logger.info(
-            "Starting strategy worker: group=strategy-module, streams=%s",
+            "Starting strategy worker: group=strategy, streams=%s",
             list(streams.keys()),
         )
 
         async for message in redis_consumer.consume(
-            group_name="strategy-module",
+            group_name="strategy",
             consumer_name="strategy-1",
             streams=streams,
             block=1000,  # 1秒ブロック
@@ -119,7 +119,7 @@ async def run_worker(settings: Settings) -> None:
                     # OHLCV が生成されない場合でも ACK を送信（無効なメッセージとして処理済み）
                     await redis_consumer.ack(
                         stream_name=message["stream"],
-                        group_name="strategy-module",
+                        group_name="strategy",
                         message_id=message["id"],
                     )
                     continue
@@ -151,7 +151,7 @@ async def run_worker(settings: Settings) -> None:
                 # メッセージ処理完了を通知（ACK）
                 await redis_consumer.ack(
                     stream_name=message["stream"],
-                    group_name="strategy-module",
+                    group_name="strategy",
                     message_id=message["id"],
                 )
 
@@ -163,7 +163,7 @@ async def run_worker(settings: Settings) -> None:
                 try:
                     await redis_consumer.ack(
                         stream_name=message["stream"],
-                        group_name="strategy-module",
+                        group_name="strategy",
                         message_id=message["id"],
                     )
                 except Exception as ack_error:

@@ -1,13 +1,13 @@
 確認方法と確認項目をまとめ
 
-## strategy-module の動作確認方法と確認項目
+## strategy の動作確認方法と確認項目
 
 ### 1. Redis への接続成功
 
 #### 確認方法
 **ログ確認**:
 ```bash
-docker-compose -f docker-compose.local.yml logs strategy-module | grep "Connected to Redis"
+docker-compose -f docker-compose.local.yml logs strategy | grep "Connected to Redis"
 ```
 
 **期待されるログ**:
@@ -35,21 +35,21 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli PING
 #### 確認方法
 **ログ確認**:
 ```bash
-docker-compose -f docker-compose.local.yml up -d strategy-module && sleep 5 && docker-compose -f docker-compose.local.yml logs strategy-module | grep -E "Created consumer group|Consumer group already exists"
+docker-compose -f docker-compose.local.yml up -d strategy && sleep 5 && docker-compose -f docker-compose.local.yml logs strategy | grep -E "Created consumer group|Consumer group already exists"
 ```
 
 **期待されるログ**:
 ```
  ✔ Container redis            Running                                                                                                                                                                                                                                           0.0s
- ✔ Container strategy-module  Running                                                                                                                                                                                                                                           0.0s
-strategy-module  | 2025-12-13 15:26:59 - infrastructure.redis.consumer - INFO - Consumer group already exists: strategy-module for stream: md:ticker
-strategy-module  | 2025-12-13 15:26:59 - infrastructure.redis.consumer - INFO - Consumer group already exists: strategy-module for stream: md:orderbook
-strategy-module  | 2025-12-13 15:26:59 - infrastructure.redis.consumer - INFO - Consumer group already exists: strategy-module for stream: md:trade
+ ✔ Container strategy  Running                                                                                                                                                                                                                                           0.0s
+strategy  | 2025-12-13 15:26:59 - infrastructure.redis.consumer - INFO - Consumer group already exists: strategy for stream: md:ticker
+strategy  | 2025-12-13 15:26:59 - infrastructure.redis.consumer - INFO - Consumer group already exists: strategy for stream: md:orderbook
+strategy  | 2025-12-13 15:26:59 - infrastructure.redis.consumer - INFO - Consumer group already exists: strategy for stream: md:trade
 ```
 
 **確認項目**:
 - [x] 3つのStream（`md:ticker`, `md:orderbook`, `md:trade`）すべてでConsumer Groupが作成されている
-- [x] Consumer Group名が `strategy-module` である
+- [x] Consumer Group名が `strategy` である
 - [x] エラーメッセージがない（既に存在する場合は `BUSYGROUP` エラーは無視される）
 
 **Redis CLI での確認**:
@@ -62,7 +62,7 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli XINFO GROUPS md:
 
 **期待される出力例**:
 ```
-1) name: strategy-module
+1) name: strategy
 2) consumers: 1
 3) pending: 0
 4) last-delivered-id: 1734123456789-0
@@ -75,16 +75,16 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli XINFO GROUPS md:
 #### 確認方法
 **ログ確認**:
 ```bash
-docker-compose -f docker-compose.local.yml logs strategy-module | grep "Starting to consume"
+docker-compose -f docker-compose.local.yml logs strategy | grep "Starting to consume"
 ```
 
 **期待されるログ**:
 ```
-2025-12-13 15:08:52 - infrastructure.redis.consumer - INFO - Starting to consume from Redis Streams: group=strategy-module, consumer=strategy-1, streams=['md:ticker', 'md:orderbook', 'md:trade']
+2025-12-13 15:08:52 - infrastructure.redis.consumer - INFO - Starting to consume from Redis Streams: group=strategy, consumer=strategy-1, streams=['md:ticker', 'md:orderbook', 'md:trade']
 ```
 
 **確認項目**:
-- [ ] Consumer Group名が `strategy-module` である
+- [ ] Consumer Group名が `strategy` である
 - [ ] Consumer名が `strategy-1` である
 - [ ] 3つのStream（`md:ticker`, `md:orderbook`, `md:trade`）を購読している
 - [ ] メッセージ処理のログが継続的に出力されている（エラーがない）
@@ -92,11 +92,11 @@ docker-compose -f docker-compose.local.yml logs strategy-module | grep "Starting
 **Redis CLI での確認**:
 ```bash
 # 未処理メッセージの確認（Pending List）
-docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:ticker strategy-module
-docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:trade strategy-module
+docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:ticker strategy
+docker-compose -f docker-compose.local.yml exec redis redis-cli --json XPENDING md:trade strategy
 
 # Consumer の状態確認
-docker-compose -f docker-compose.local.yml exec redis redis-cli --json XINFO CONSUMERS md:ticker strategy-module
+docker-compose -f docker-compose.local.yml exec redis redis-cli --json XINFO CONSUMERS md:ticker strategy
 ```
 オプションで出力形式を変更できます。
 
@@ -111,7 +111,7 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli --json XINFO CON
 #### 確認方法
 **ログ確認**:
 ```bash
-docker-compose -f docker-compose.local.yml logs strategy-module | grep -E "Golden cross|Dead cross|Generated signal"
+docker-compose -f docker-compose.local.yml logs strategy | grep -E "Golden cross|Dead cross|Generated signal"
 ```
 
 **期待されるログ**:
@@ -134,7 +134,7 @@ docker-compose -f docker-compose.local.yml logs strategy-module | grep -E "Golde
 **詳細ログ確認（DEBUG レベル）**:
 ```bash
 # 環境変数を変更して再起動
-LOG_LEVEL=DEBUG docker-compose -f docker-compose.local.yml up strategy-module
+LOG_LEVEL=DEBUG docker-compose -f docker-compose.local.yml up strategy
 ```
 
 ---
@@ -144,7 +144,7 @@ LOG_LEVEL=DEBUG docker-compose -f docker-compose.local.yml up strategy-module
 #### 確認方法
 **ログ確認**:
 ```bash
-docker-compose -f docker-compose.local.yml logs strategy-module | grep "Published signal"
+docker-compose -f docker-compose.local.yml logs strategy | grep "Published signal"
 ```
 
 **期待されるログ**:
@@ -191,13 +191,13 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli XREVRANGE signal
 ### 1. ログの一括確認
 ```bash
 # すべてのログを確認
-docker-compose -f docker-compose.local.yml logs -f strategy-module
+docker-compose -f docker-compose.local.yml logs -f strategy
 
 # エラーのみ確認
-docker-compose -f docker-compose.local.yml logs strategy-module | grep -i error
+docker-compose -f docker-compose.local.yml logs strategy | grep -i error
 
 # 重要なイベントのみ確認
-docker-compose -f docker-compose.local.yml logs strategy-module | grep -E "Connected|Created consumer group|Starting to consume|Generated signal|Published signal"
+docker-compose -f docker-compose.local.yml logs strategy | grep -E "Connected|Created consumer group|Starting to consume|Generated signal|Published signal"
 ```
 
 ### 2. Redis の状態確認
@@ -214,13 +214,13 @@ docker-compose -f docker-compose.local.yml exec redis redis-cli XLEN signal:gmo:
 ### 3. メトリクス確認
 ```bash
 # 処理されたメッセージ数の確認
-docker-compose -f docker-compose.local.yml logs strategy-module | grep "Generated signal" | wc -l
+docker-compose -f docker-compose.local.yml logs strategy | grep "Generated signal" | wc -l
 
 # 配信されたシグナル数の確認
-docker-compose -f docker-compose.local.yml logs strategy-module | grep "Published signal" | wc -l
+docker-compose -f docker-compose.local.yml logs strategy | grep "Published signal" | wc -l
 
 # クロス検出回数の確認
-docker-compose -f docker-compose.local.yml logs strategy-module | grep -E "Golden cross|Dead cross" | wc -l
+docker-compose -f docker-compose.local.yml logs strategy | grep -E "Golden cross|Dead cross" | wc -l
 ```
 
 ---
@@ -236,4 +236,4 @@ docker-compose -f docker-compose.local.yml logs strategy-module | grep -E "Golde
 5. **配信**: 生成されたシグナルが Redis Stream に配信されている
 6. **エラーなし**: エラーログが出力されていない
 
-これらの確認方法で、strategy-module の動作を検証できます。
+これらの確認方法で、strategy の動作を検証できます。

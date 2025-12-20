@@ -1,5 +1,5 @@
 [project]
-name = "strategy-module"
+name = "strategy"
 version = "0.1.0"
 description = "Strategy module worker for market data consumption and signal generation."
 requires-python = ">=3.14"

@@ -1,8 +1,8 @@
-# ws-collector-node テスト
+# collector テスト
 
 ## 概要
 
-ws-collector-node の動作確認を自動化するテストスイートです。
+collector の動作確認を自動化するテストスイートです。
 
 ## テストの種類
 
@@ -371,6 +371,6 @@ ESLint v9 は `jiti` を使用して TypeScript 設定ファイル（`eslint.con
 
 - [Vitest ドキュメント](https://vitest.dev/)
 - [Redis Streams ドキュメント](https://redis.io/docs/data-types/streams/)
-- [ws-collector-node 設計](../docs/architecture/02_ws_collector_node.md)
+- [collector 設計](../docs/architecture/02_collector.md)
 - [Biome ドキュメント](https://biomejs.dev/)
 

@@ -1,4 +1,4 @@
-# ws-collector-node 設計
+# collector 設計
 
 Node.js で実装する WebSocket データコレクター。取引所の WebSocket API からリアルタイムで市場データ（ticker/orderbook/trade）を取得し、正規化して Redis Stream に配信する。
 
@@ -20,7 +20,7 @@ Node.js で実装する WebSocket データコレクター。取引所の WebSoc
 
 ### 責務
 
-ws-collector-node は以下の責務を持つ:
+collector は以下の責務を持つ:
 
 - **WebSocket 接続管理**: 取引所の Public WebSocket API に接続し、ticker/orderbook/trade を購読
 - **データ正規化**: 取引所ごとに異なるメッセージ形式を統一フォーマットに変換
@@ -510,7 +510,7 @@ Redis Stream の各エントリは以下の形式:
 
 ```
 services/
-└── ws-collector-node/
+└── collector/
     ├── src/
     │   ├── main.ts                 # エントリーポイント
     │   ├── types.ts                # 型定義

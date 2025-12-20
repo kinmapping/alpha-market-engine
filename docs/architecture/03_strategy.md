@@ -1,6 +1,6 @@
-# Strategy Module アーキテクチャ
+# Strategy アーキテクチャ
 
-strategy-module の設計と実装方針。Redis Stream から市場データを購読し、OHLCV 生成、テクニカル指標計算、シグナル生成を行う。キューワーカーとして動作し、生成したシグナルを Redis Stream に配信する。
+strategy の設計と実装方針。Redis Stream から市場データを購読し、OHLCV 生成、テクニカル指標計算、シグナル生成を行う。キューワーカーとして動作し、生成したシグナルを Redis Stream に配信する。
 
 ## 目次
 
@@ -19,7 +19,7 @@ strategy-module の設計と実装方針。Redis Stream から市場データを
 
 ### 責務
 
-strategy-module は以下の責務を持つ:
+strategy は以下の責務を持つ:
 
 - **Redis Stream 購読**: `md:trade`, `md:orderbook`, `md:ticker` を Consumer Group で購読（キューワーカーとして動作）
 - **OHLCV 生成**: 市場データから OHLCV（1秒/1分など）を生成
@@ -35,7 +35,7 @@ strategy-module は以下の責務を持つ:
 - **キューワーカーとして動作**: Redis Stream を購読してメッセージを処理するバックグラウンドワーカー
 - **戦略の交換可能性**: 戦略ロジックを独立したコンポーネントとして実装し、交換可能にする
 - **段階的な発展**: 初期はルールベース、将来的に AI/ML モデルに置き換え可能
-- **エンティティ共有**: execution-module とエンティティクラス（モデル）を共有し、一貫性を保つ（`shared/domain/models/`）
+- **エンティティ共有**: execution とエンティティクラス（モデル）を共有し、一貫性を保つ（`shared/domain/models/`）
 
 ---
 
@@ -87,7 +87,7 @@ signal_generator = SignalGeneratorUseCase(strategy_factory.create(STRATEGY_NAME)
 
 # Consumer Group で市場データを購読
 for message in redis_consumer.consume(
-    group="strategy-module",
+    group="strategy",
     consumer="strategy-1",
     streams={"md:ticker": ">", "md:orderbook": ">", "md:trade": ">"}
 ):
@@ -131,7 +131,7 @@ for message in redis_consumer.consume(
 
 **主要エンティティ**:
 - すべてのエンティティ（`OHLCV`, `Signal`, `Order`, `Execution`, `Position`）は `shared/domain/models/` 配下で共有されます
-- strategy-module では `OHLCV` と `Signal` を主に使用します
+- strategy では `OHLCV` と `Signal` を主に使用します
 
 ### Application 層のコンポーネント
 
@@ -418,11 +418,11 @@ CREATE INDEX idx_signals_action ON signals(action, timestamp DESC);
 
 ### レイヤードアーキテクチャ
 
-strategy-module はレイヤードアーキテクチャを採用し、責務に基づいて層を分離します。
+strategy はレイヤードアーキテクチャを採用し、責務に基づいて層を分離します。
 
 ```
 services/
-└── strategy_module/
+└── strategy/
     ├── __init__.py
     ├── config.py              # 設定管理
     ├── main.py                # エントリーポイント（Strategy メインループ）
@@ -678,7 +678,7 @@ class SignalRepositoryImpl(SignalRepository):
 
 ### 環境変数（.env）
 
-strategy-module の設定は環境変数で管理する。
+strategy の設定は環境変数で管理する。
 
 **必須設定**:
 ```env
@@ -751,8 +751,7 @@ class Config:
 
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/)
 - [architecture.md](./01_architecture.md) - システム全体のアーキテクチャ
-- [ws_collector_node.md](./02_ws_collector_node.md) - WebSocket データコレクターの設計
-- [execution-module 設計](./04_execution_archi.md) - Execution モジュールの設計
+- [collector 設計](./02_collector.md) - WebSocket データコレクターの設計
+- [execution 設計](./04_execution.md) - Execution モジュールの設計
 - [trading_domain.md](../domain/trading_domain.md) - 取引ドメインのルール
 - [coding_standards.md](../coding_standards.md) - コード規約
-

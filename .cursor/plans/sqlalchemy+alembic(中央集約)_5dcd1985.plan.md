@@ -21,7 +21,7 @@ todos:
     dependencies:
       - init-root-alembic
   - id: refactor-strategy-db
-    content: strategy_module の DB 層を shared 参照＋SQLAlchemy Core insert に移行。main.py の schema init を削除
+    content: strategy の DB 層を shared 参照＋SQLAlchemy Core insert に移行。main.py の schema init を削除
     status: completed
     dependencies:
       - add-shared-db-layer
@@ -49,7 +49,7 @@ todos:
 
 - **Alembic はリポジトリルートに1つ**（`alembic/`, `alembic.ini`）
 - **SQLAlchemy Table 定義は shared に統合**（単一 `MetaData`）
-- `strategy_module` / `execution_module` は **shared の schema/connection を参照**してリポジトリ実装を行う
+- `strategy` / `execution` は **shared の schema/connection を参照**してリポジトリ実装を行う
 - 起動時に `CREATE TABLE IF NOT EXISTS ...` を叩くのはやめ、**DB作成は alembic upgrade** に寄せる
 
 ---
@@ -58,8 +58,8 @@ todos:
 
 - `shared/infrastructure/database/`（新設）
 - `alembic/`（新設）と `alembic.ini`（新設）
-- `services/strategy_module/infrastructure/database/`（shared 参照に寄せて整理）
-- `services/strategy_module/main.py`（起動時 schema init を削除）
+- `services/strategy/infrastructure/database/`（shared 参照に寄せて整理）
+- `services/strategy/main.py`（起動時 schema init を削除）
 
 ---
 
@@ -205,10 +205,10 @@ target_metadata = metadata
 
 ---
 
-### 6) strategy_module の DB 実装を shared に寄せる
+### 6) strategy の DB 実装を shared に寄せる
 
-- `services/strategy_module/infrastructure/database/schema.py` は **廃止**（shared を参照）
-- `services/strategy_module/infrastructure/database/connection.py` も **廃止**（shared を参照）
+- `services/strategy/infrastructure/database/schema.py` は **廃止**（shared を参照）
+- `services/strategy/infrastructure/database/connection.py` も **廃止**（shared を参照）
 - `OhlcvRepositoryImpl` / `SignalRepositoryImpl` は SQLAlchemy Core の `insert()` を使う
 
 **コード案（OHLCV 保存：抜粋）**
@@ -253,9 +253,9 @@ stmt = insert(ohlcv).values(...).on_conflict_do_nothing(
 - `add-shared-db-layer`: `shared/infrastructure/database/{schema.py,connection.py}` を新設
 - `init-root-alembic`: ルートに Alembic を初期化し shared.metadata を参照
 - `create-initial-migration`: `ohlcv`/`signals` の初期マイグレーション作成
-- `refactor-strategy-db`: strategy_module の DB 層を shared 参照に変更（schema init 削除含む）
+- `refactor-strategy-db`: strategy の DB 層を shared 参照に変更（schema init 削除含む）
 - `update-tests`: DB 保存テストを SQLAlchemy/Alembic 前提に更新
-- `legacy-cleanup`: `services/strategy_module/infrastructure/database/migrations/001_initial_schema.sql` 等の旧資産を整理（削除 or legacy に退避）
+- `legacy-cleanup`: `services/strategy/infrastructure/database/migrations/001_initial_schema.sql` 等の旧資産を整理（削除 or legacy に退避）
 
 ---
 

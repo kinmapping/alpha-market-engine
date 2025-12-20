@@ -1,5 +1,5 @@
 {
-  "name": "ws-collector-node",
+  "name": "collector",
   "version": "1.0.0",
   "type": "module",
   "private": true,

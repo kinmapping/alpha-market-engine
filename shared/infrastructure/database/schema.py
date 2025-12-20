@@ -1,7 +1,7 @@
 """Shared database schema definitions using SQLAlchemy.
 
 すべてのテーブル定義を単一の MetaData で管理します。
-strategy-module と execution-module が共有するデータベースのスキーマを定義します。
+strategy と execution が共有するデータベースのスキーマを定義します。
 """
 from sqlalchemy import (
     MetaData,
