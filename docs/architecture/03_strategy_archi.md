@@ -44,14 +44,18 @@ strategy-module は以下の責務を持つ:
 ### 全体フロー
 
 ```mermaid
-graph LR
-    Redis["<strong>Redis</strong><br/>(同一インスタンス)"]
+flowchart LR
+    Redis@{shape: das, label: "<br/><strong>Redis</strong><br/><br/>(同一インスタンス)"}
     Strategy["<strong>Strategy Module</strong><br/>OHLCV生成<br/>指標計算<br/>シグナル生成"]
-    DB["<strong>PostgreSQL</strong><br/>OHLCV / シグナル"]
+    DB[("<strong>PostgreSQL</strong><br/>OHLCV / シグナル")]
 
-    Redis -->|XREADGROUP<br/>購読<br/>md:ticker<br/>md:orderbook<br/>md:trade| Strategy
-    Strategy -->|XADD<br/>配信<br/>signal:*| Redis
-    Strategy -->|保存<br/>OHLCV / シグナル| DB
+    Redis e1@==>|XREADGROUP<br/>購読<br/>md:ticker<br/>md:orderbook<br/>md:trade| Strategy
+    Strategy e2@==>|XADD<br/>配信<br/>signal:*| Redis
+    Strategy e3@==>|保存<br/>OHLCV / シグナル| DB
+
+    e1@{ animate: true }
+    e2@{ animate: true }
+    e3@{ animate: true }
 ```
 
 ### Strategy ユースケースのメインループ（Application 層）
@@ -63,7 +67,7 @@ from application.usecases.strategy.ohlcv_generator import OHLCVGeneratorUseCase
 from application.usecases.strategy.indicator_calculator import IndicatorCalculatorUseCase
 from application.usecases.strategy.signal_generator import SignalGeneratorUseCase
 from application.services.signal_publisher import SignalPublisherService
-from shared.application.interfaces.ohlcv_repository import OhlcvRepository
+from shared.application.interfaces.i_ohlcv_repository import OhlcvRepository
 from shared.application.interfaces.signal_repository import SignalRepository
 from infrastructure.database.repositories.ohlcv_repository import OhlcvRepositoryImpl
 from infrastructure.database.repositories.signal_repository import SignalRepositoryImpl

@@ -24,30 +24,40 @@ Node.js と Python のハイブリッド構成で、24/7 安定稼働する自�
 ### 最小構成
 
 ```mermaid
-graph TB
-    GMO["<strong>GMO WebSocket</strong><br/>(Public API)"]
+flowchart TB
+    %% A@{ img: "https://mermaid.js.org/favicon.svg", label: "My example image label", pos: "t", h: 60, constraint: "on" }
+    GMO@{ shape: cloud, label: "<strong>GMO WebSocket</strong><br/>(Public API)" }
     WS["<strong>ws-collector-node</strong><br/>(Node.js)<br/>WS購読 / 正規化 / <br/>Redis配信"]
-    Redis["<strong>Redis</strong><br/>(Stream)"]
+    Redis@{shape: das, label: "<strong>Redis</strong><br/>(Stream)"}
     %% Trading["<strong>trading-engine</strong><br/>(Python)<br/>Strategy: OHLCV生成 / <br/>指標計算 / シグナル<br/>Execution: リスク管理 / <br/>注文実行"]
 
     Strategy["<strong>strategy-module</strong><br/>OHLCV生成 / <br/>指標計算 / シグナル"]
     Execution["<strong>execution-module</strong><br/>リスク管理 / <br/>注文実行"]
-    DB["<strong>PostgreSQL</strong><br/>取引履歴 / OHLCV / <br/>シグナル / 注文"]
+    DB[("<strong>PostgreSQL</strong><br/>取引履歴 / OHLCV / <br/>シグナル / 注文")]
 
     subgraph "trading-engine"
     Strategy
     Execution
     end
 
-    GMO -->|WebSocket| WS
-    WS -->|XADD（配信）<br/>md:trade<br/>md:orderbook<br/>md:ticker| Redis
-    Redis -->|XREADGROUP（購読）<br/>md:*| Strategy
-    Strategy -->|XADD（配信）<br/>signal:*| Redis
-    Redis -->|XREADGROUP（購読）<br/>signal:*| Execution
-    Execution -->|REST API<br/>注文| GMO
-    Strategy -->|OHLCV とシグナルを保存| DB
+    GMO e1@==>|WebSocket| WS
+    WS e2@==>|XADD（配信）<br/>md:trade<br/>md:orderbook<br/>md:ticker| Redis
+    Redis e3@==>|XREADGROUP（購読）<br/>md:*| Strategy
+    Strategy e4@==>|XADD（配信）<br/>signal:*| Redis
+    Redis e5@==>|XREADGROUP（購読）<br/>signal:*| Execution
+    Execution e6@==>|REST API<br/>注文| GMO
+    Strategy e7@==>|OHLCV とシグナルを保存| DB
     %% DB --> Execution
-    Execution <-->|注文と約定の保存<br/><br/>ポジション状態の読み取り| DB
+    Execution e8@==>|注文と約定の保存<br/><br/>ポジション状態の読み取り| DB
+
+    e1@{ animate: true }
+    e2@{ animate: true }
+    e3@{ animate: true }
+    e4@{ animate: true }
+    e5@{ animate: true }
+    e6@{ animate: true }
+    e7@{ animate: true }
+    e8@{ animate: true }
 ```
 
 **Redis Stream を介した非同期通信を行う**
@@ -577,7 +587,7 @@ sys.path.insert(0, str(shared_path))
 from domain.models.signal import Signal
 from domain.models.ohlcv import OHLCV  # 共有エンティティ
 from application.interfaces.signal_repository import SignalRepository  # 共有インターフェース
-from application.interfaces.ohlcv_repository import OhlcvRepository  # 共有インターフェース
+from application.interfaces.i_ohlcv_repository import OhlcvRepository  # 共有インターフェース
 ```
 
 **例: execution-module からのインポート**:
