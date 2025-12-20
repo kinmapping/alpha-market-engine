@@ -14,7 +14,7 @@ import pandas as pd
 from shared.domain.models import OHLCV
 
 if TYPE_CHECKING:
-    from shared.application.interfaces.ohlcv_repository import OhlcvRepository
+    from shared.application.interfaces.i_ohlcv_repository import IOhlcvRepository
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class OHLCVGeneratorUseCase:
     時間足ごと（1秒/1分/5分など）に集約します。
     """
 
-    def __init__(self, repository: Optional["OhlcvRepository"] = None) -> None:
+    def __init__(self, repository: Optional["IOhlcvRepository"] = None) -> None:
         """Initialize OHLCV Generator Use Case.
 
         Args:
@@ -182,11 +182,7 @@ class OHLCVGeneratorUseCase:
         # OHLCV を生成（1秒足）
         ohlcv = self._generate_ohlcv_from_buffer(symbol, exchange, timeframe="1s")
 
-        if ohlcv and self.repository:
-            # リポジトリに保存（非同期処理は将来実装）
-            try:
-                self.repository.save(ohlcv)
-            except Exception as e:
-                logger.error("Failed to save OHLCV: %s", e, exc_info=True)
+        # 注意: リポジトリへの保存は main.py で非同期に実行されます
+        # ここでは生成のみを行います
 
         return ohlcv

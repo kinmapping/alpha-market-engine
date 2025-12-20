@@ -20,11 +20,12 @@ from application.services.signal_publisher import SignalPublisherService
 from application.usecases.strategy.indicator_calculator import IndicatorCalculatorUseCase
 from application.usecases.strategy.ohlcv_generator import OHLCVGeneratorUseCase
 from application.usecases.strategy.signal_generator import SignalGeneratorUseCase
-from infrastructure.database.repositories.ohlcv_repository import OhlcvRepositoryImpl
-from infrastructure.database.repositories.signal_repository import SignalRepositoryImpl
+from infrastructure.database.repositories.ohlcv_repository import OhlcvRepository
+from infrastructure.database.repositories.signal_repository import SignalRepository
 from infrastructure.redis.consumer import RedisStreamConsumer
 from infrastructure.redis.publisher import RedisStreamPublisher
 from infrastructure.strategies.moving_average_cross import MovingAverageCrossStrategy
+from shared.infrastructure.database.connection import Database
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +64,27 @@ async def run_worker(settings: Settings) -> None:
         await redis_consumer.connect()
         await redis_publisher.connect()
 
-        # リポジトリを初期化（将来のDB接続用）
-        ohlcv_repo = OhlcvRepositoryImpl() if settings.database_url else None
-        signal_repo = SignalRepositoryImpl() if settings.database_url else None
+        # データベース接続を初期化（オプショナル）
+        # 注意: マイグレーションは Alembic で管理します（起動前に `alembic upgrade head` を実行）
+        database: Database | None = None
+        ohlcv_repo: OhlcvRepository | None = None
+        signal_repo: SignalRepository | None = None
+
+        if settings.database_url:
+            try:
+                database = Database(settings.database_url)
+                await database.connect()
+
+                # リポジトリを初期化
+                ohlcv_repo = OhlcvRepository(database)
+                signal_repo = SignalRepository(database)
+                logger.info("Database repositories initialized")
+            except Exception as e:
+                logger.error("Failed to initialize database connection: %s", e, exc_info=True)
+                logger.warning("Continuing without database persistence")
+                database = None
+                ohlcv_repo = None
+                signal_repo = None
 
         # Application 層のユースケースを初期化
         ohlcv_generator = OHLCVGeneratorUseCase(repository=ohlcv_repo)
@@ -105,6 +124,13 @@ async def run_worker(settings: Settings) -> None:
                     )
                     continue
 
+                # OHLCV を保存
+                if ohlcv_repo:
+                    try:
+                        await ohlcv_repo.save(ohlcv)
+                    except Exception as e:
+                        logger.error("Failed to save OHLCV: %s", e, exc_info=True)
+
                 # 指標計算
                 indicators = indicator_calculator.execute(ohlcv)
 
@@ -115,10 +141,10 @@ async def run_worker(settings: Settings) -> None:
                     # シグナルを配信
                     await signal_publisher.publish(signal)
 
-                    # シグナルを保存（将来のDB接続用）
+                    # シグナルを保存
                     if signal_repo:
                         try:
-                            signal_repo.save(signal)
+                            await signal_repo.save(signal)
                         except Exception as e:
                             logger.error("Failed to save signal: %s", e, exc_info=True)
 
@@ -154,6 +180,15 @@ async def run_worker(settings: Settings) -> None:
         redis_consumer.stop()
         await redis_consumer.close()
         await redis_publisher.close()
+
+        # データベース接続を閉じる
+        if database:
+            try:
+                await database.dispose()
+                logger.info("Database connection closed")
+            except Exception as e:
+                logger.error("Failed to close database connection: %s", e, exc_info=True)
+
         logger.info("Worker stopped")
 
 
