@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmoWebSocketClient } from '@/infrastructure/adapters/gmo/GmoWebSocketClient';
-import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/messages/GmoRawMessage';
-import type { WebSocketConnection } from '@/infrastructure/websocket/WebSocketConnection';
+import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/types/GmoRawMessage';
+import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
 
 // StandardWebSocketConnection をモック
 const mockOnOpen = vi.fn();
@@ -13,13 +13,23 @@ const mockClose = vi.fn();
 const mockRemoveAllListeners = vi.fn();
 const mockTerminate = vi.fn();
 
-vi.mock('@/infrastructure/websocket/WebSocketConnection', () => {
+vi.mock('@/infrastructure/websocket/StandardWebSocketConnection', () => {
   class MockStandardWebSocketConnection {
+    private openCallbacks: Array<() => void> = [];
+    private errorCallbacks: Array<(error: Event) => void> = [];
+
+    constructor(_socket: WebSocket) {
+      // コンストラクタで socket.addEventListener が呼ばれても問題ないようにする
+      // モックなので何もしない（実際のイベント発火はテストで制御）
+    }
+
     onOpen(callback: () => void): void {
+      this.openCallbacks.push(callback);
       mockOnOpen(callback);
     }
 
     onError(callback: (error: Event) => void): void {
+      this.errorCallbacks.push(callback);
       mockOnError(callback);
     }
 
@@ -40,6 +50,8 @@ vi.mock('@/infrastructure/websocket/WebSocketConnection', () => {
     }
 
     removeAllListeners(): void {
+      this.openCallbacks = [];
+      this.errorCallbacks = [];
       mockRemoveAllListeners();
     }
 
@@ -131,20 +143,13 @@ describe('GmoWebSocketClient', () => {
     it('WebSocket接続が成功すると、WebSocketConnection を返す', async () => {
       const wsUrl = 'wss://api.coin.z.com/ws/public/v1';
 
-      // onOpen コールバックを保存
-      let onOpenCallback: (() => void) | undefined;
+      // onOpen コールバックを保存して即座に実行
       mockOnOpen.mockImplementation((callback: () => void) => {
-        onOpenCallback = callback;
+        // コールバックを即座に実行（モックなので）
+        callback();
       });
 
-      const connectPromise = client.connect(wsUrl);
-
-      // onOpen コールバックを実行
-      if (onOpenCallback) {
-        onOpenCallback();
-      }
-
-      const connection = await connectPromise;
+      const connection = await client.connect(wsUrl);
 
       expect(connection).toBeDefined();
       expect(mockOnOpen).toHaveBeenCalled();
@@ -154,20 +159,18 @@ describe('GmoWebSocketClient', () => {
     it('WebSocket接続が失敗すると、エラーを投げる', async () => {
       const wsUrl = 'wss://api.coin.z.com/ws/public/v1';
 
-      // onError コールバックを保存
-      let onErrorCallback: ((error: Event) => void) | undefined;
-      mockOnError.mockImplementation((callback: (error: Event) => void) => {
-        onErrorCallback = callback;
+      // onOpen は呼ばない（エラーケースなので）
+      mockOnOpen.mockImplementation(() => {
+        // 何もしない（エラーが先に発生する）
       });
 
-      const connectPromise = client.connect(wsUrl);
+      // onError コールバックを保存して即座に実行
+      mockOnError.mockImplementation((callback: (error: Event) => void) => {
+        // コールバックを即座に実行（モックなので）
+        callback(new Event('error'));
+      });
 
-      // onError コールバックを実行
-      if (onErrorCallback) {
-        onErrorCallback(new Event('error'));
-      }
-
-      await expect(connectPromise).rejects.toThrow('WebSocket connection failed');
+      await expect(client.connect(wsUrl)).rejects.toThrow('WebSocket connection failed');
       expect(mockRemoveAllListeners).toHaveBeenCalled();
     });
   });
@@ -339,17 +342,12 @@ describe('GmoWebSocketClient', () => {
     it('接続が存在する場合、接続を切断する', async () => {
       const wsUrl = 'wss://api.coin.z.com/ws/public/v1';
 
-      // 接続を確立
-      let onOpenCallback: (() => void) | undefined;
+      // 接続を確立（onOpen コールバックを即座に実行）
       mockOnOpen.mockImplementation((callback: () => void) => {
-        onOpenCallback = callback;
+        callback();
       });
 
-      const connectPromise = client.connect(wsUrl);
-      if (onOpenCallback) {
-        onOpenCallback();
-      }
-      await connectPromise;
+      await client.connect(wsUrl);
 
       // 切断
       client.disconnect();

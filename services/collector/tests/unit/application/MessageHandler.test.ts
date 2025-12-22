@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EventPublisher, MessageParser } from '@/application/handlers/MessageHandler';
-import { DefaultMessageHandler } from '@/application/handlers/MessageHandler';
+import { DefaultMessageHandler } from '@/application/handlers/DefaultMessageHandler';
+import type { EventPublisher } from '@/application/interfaces/EventPublisher';
+import type { MessageParser } from '@/application/interfaces/MessageParser';
 import type { NormalizedEvent } from '@/domain/types';
 
 /**

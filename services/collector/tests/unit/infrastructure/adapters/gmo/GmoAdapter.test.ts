@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MessageHandler } from '@/application/handlers/MessageHandler';
+import type { MessageHandler } from '@/application/interfaces/MessageHandler';
 import { GmoAdapter } from '@/infrastructure/adapters/gmo/GmoAdapter';
-import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/messages/GmoRawMessage';
-import type { WebSocketConnection } from '@/infrastructure/websocket/WebSocketConnection';
+import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/types/GmoRawMessage';
+import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
 
 // GmoWebSocketClient をモック
 const mockConnect = vi.fn();
