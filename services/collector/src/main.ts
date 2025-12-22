@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import process from 'node:process';
-import { DefaultMessageHandler } from '@/application/handlers/MessageHandler';
+import { DefaultMessageHandler } from '@/application/handlers/DefaultMessageHandler';
 import { GmoAdapter } from '@/infrastructure/adapters/gmo/GmoAdapter';
 import { GmoMessageParser } from '@/infrastructure/adapters/gmo/GmoMessageParser';
 import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';

@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import type { EventPublisher } from '@/application/handlers/MessageHandler';
+import type { EventPublisher } from '@/application/interfaces/EventPublisher';
 import type { NormalizedEvent } from '@/domain/types';
 
 /**

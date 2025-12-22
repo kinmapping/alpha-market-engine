@@ -1,6 +1,6 @@
-import type { MessageParser } from '@/application/handlers/MessageHandler';
+import type { MessageParser } from '@/application/interfaces/MessageParser';
 import type { NormalizedEvent } from '@/domain/types';
-import type { GmoRawMessage } from './messages/GmoRawMessage';
+import type { GmoRawMessage } from './types/GmoRawMessage';
 
 /**
  * インフラ層: GMO メッセージ形式のパース処理（実装の詳細を担当）

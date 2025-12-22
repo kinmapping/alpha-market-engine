@@ -1,7 +1,7 @@
-import type { MessageHandler } from '@/application/handlers/MessageHandler';
 import type { MarketDataAdapter } from '@/application/interfaces/MarketDataAdapter';
+import type { MessageHandler } from '@/application/interfaces/MessageHandler';
 import { ReconnectManager } from '@/infrastructure/reconnect/ReconnectManager';
-import type { WebSocketConnection } from '@/infrastructure/websocket/WebSocketConnection';
+import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
 import { GmoWebSocketClient } from './GmoWebSocketClient';
 
 /**

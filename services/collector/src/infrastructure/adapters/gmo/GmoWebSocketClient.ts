@@ -1,6 +1,7 @@
-import { StandardWebSocketConnection, type WebSocketConnection } from '@/infrastructure/websocket/WebSocketConnection';
-import type { GmoCommand } from './messages/GmoCommand';
-import type { GmoRawMessage } from './messages/GmoRawMessage';
+import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
+import { StandardWebSocketConnection } from '@/infrastructure/websocket/StandardWebSocketConnection';
+import type { GmoCommand } from './types/GmoCommand';
+import type { GmoRawMessage } from './types/GmoRawMessage';
 
 /**
  * インフラ層: GMO WebSocket 接続・購読・受信（低レベル）
