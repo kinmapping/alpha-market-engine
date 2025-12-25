@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GmoWebSocketClient } from '@/infrastructure/adapters/gmo/GmoWebSocketClient';
-import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/types/GmoRawMessage';
-import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
+import { GmoWebSocketClient } from '@/infra/adapters/gmo/GmoWebSocketClient';
+import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
+import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
 
 // StandardWebSocketConnection をモック
 const mockOnOpen = vi.fn();
@@ -13,15 +13,10 @@ const mockClose = vi.fn();
 const mockRemoveAllListeners = vi.fn();
 const mockTerminate = vi.fn();
 
-vi.mock('@/infrastructure/websocket/StandardWebSocketConnection', () => {
+vi.mock('@/infra/websocket/StandardWebSocketConnection', () => {
   class MockStandardWebSocketConnection {
     private openCallbacks: Array<() => void> = [];
     private errorCallbacks: Array<(error: Event) => void> = [];
-
-    constructor(_socket: WebSocket) {
-      // コンストラクタで socket.addEventListener が呼ばれても問題ないようにする
-      // モックなので何もしない（実際のイベント発火はテストで制御）
-    }
 
     onOpen(callback: () => void): void {
       this.openCallbacks.push(callback);

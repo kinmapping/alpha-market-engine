@@ -1,21 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DefaultMessageHandler } from '@/application/handlers/DefaultMessageHandler';
-import type { EventPublisher } from '@/application/interfaces/EventPublisher';
 import type { MessageParser } from '@/application/interfaces/MessageParser';
-import type { NormalizedEvent } from '@/domain/types';
+import { PublishStreamUsecase } from '@/application/usecases/PublishStreamUsecase';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
+import type { StreamPublisher } from '@/domain/repositories/StreamPublisher';
 
 /**
- * 単体テスト: DefaultMessageHandler
+ * 単体テスト: PublishStreamUsecase
  *
  * 優先度2: Application層のオーケストレーションロジック
  * - 正常系: パーサー→パブリッシャーのフロー
  * - エッジケース: パーサーが null を返す場合
  * - エラーハンドリング: パブリッシャーがエラーを投げる場合
  */
-describe('DefaultMessageHandler', () => {
+describe('PublishStreamUsecase', () => {
   let mockParser: MessageParser;
-  let mockPublisher: EventPublisher;
-  let handler: DefaultMessageHandler;
+  let mockPublisher: StreamPublisher;
+  let usecase: PublishStreamUsecase;
 
   beforeEach(() => {
     // モックの作成
@@ -25,7 +25,7 @@ describe('DefaultMessageHandler', () => {
     mockPublisher = {
       publish: vi.fn(),
     };
-    handler = new DefaultMessageHandler(mockParser, mockPublisher);
+    usecase = new PublishStreamUsecase(mockParser, mockPublisher);
   });
 
   describe('正常系', () => {
@@ -42,7 +42,7 @@ describe('DefaultMessageHandler', () => {
       vi.mocked(mockParser.parse).mockReturnValue(normalizedEvent);
       vi.mocked(mockPublisher.publish).mockResolvedValue(undefined);
 
-      await handler.handle(rawMessage);
+      await usecase.execute(rawMessage);
 
       expect(mockParser.parse).toHaveBeenCalledWith(rawMessage);
       expect(mockParser.parse).toHaveBeenCalledTimes(1);
@@ -63,7 +63,7 @@ describe('DefaultMessageHandler', () => {
       vi.mocked(mockParser.parse).mockReturnValue(normalizedEvent);
       vi.mocked(mockPublisher.publish).mockResolvedValue(undefined);
 
-      await handler.handle(rawMessage);
+      await usecase.execute(rawMessage);
 
       // パーサーが先に呼ばれることを確認
       expect(mockParser.parse).toHaveBeenCalledTimes(1);
@@ -81,7 +81,7 @@ describe('DefaultMessageHandler', () => {
 
       vi.mocked(mockParser.parse).mockReturnValue(null);
 
-      await handler.handle(rawMessage);
+      await usecase.execute(rawMessage);
 
       expect(mockParser.parse).toHaveBeenCalledWith(rawMessage);
       expect(mockParser.parse).toHaveBeenCalledTimes(1);
@@ -93,7 +93,7 @@ describe('DefaultMessageHandler', () => {
 
       vi.mocked(mockParser.parse).mockReturnValue(null);
 
-      await expect(handler.handle(rawMessage)).resolves.not.toThrow();
+      await expect(usecase.execute(rawMessage)).resolves.not.toThrow();
     });
 
     it('複数回 null が返されても正常に動作する', async () => {
@@ -102,8 +102,8 @@ describe('DefaultMessageHandler', () => {
 
       vi.mocked(mockParser.parse).mockReturnValue(null);
 
-      await handler.handle(rawMessage1);
-      await handler.handle(rawMessage2);
+      await usecase.execute(rawMessage1);
+      await usecase.execute(rawMessage2);
 
       expect(mockParser.parse).toHaveBeenCalledTimes(2);
       expect(mockPublisher.publish).not.toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe('DefaultMessageHandler', () => {
       vi.mocked(mockParser.parse).mockReturnValue(normalizedEvent);
       vi.mocked(mockPublisher.publish).mockRejectedValue(publishError);
 
-      await expect(handler.handle(rawMessage)).rejects.toThrow('Redis connection failed');
+      await expect(usecase.execute(rawMessage)).rejects.toThrow('Redis connection failed');
       expect(mockParser.parse).toHaveBeenCalledTimes(1);
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
     });
@@ -152,10 +152,10 @@ describe('DefaultMessageHandler', () => {
       vi.mocked(mockPublisher.publish).mockRejectedValueOnce(new Error('First error')).mockResolvedValueOnce(undefined);
 
       // 1回目はエラー
-      await expect(handler.handle(rawMessage1)).rejects.toThrow();
+      await expect(usecase.execute(rawMessage1)).rejects.toThrow();
 
       // 2回目は成功
-      await expect(handler.handle(rawMessage2)).resolves.not.toThrow();
+      await expect(usecase.execute(rawMessage2)).resolves.not.toThrow();
       expect(mockPublisher.publish).toHaveBeenCalledTimes(2);
     });
   });
@@ -169,7 +169,7 @@ describe('DefaultMessageHandler', () => {
         throw parseError;
       });
 
-      await expect(handler.handle(rawMessage)).rejects.toThrow('Parse error');
+      await expect(usecase.execute(rawMessage)).rejects.toThrow('Parse error');
       expect(mockParser.parse).toHaveBeenCalledTimes(1);
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
@@ -197,8 +197,8 @@ describe('DefaultMessageHandler', () => {
       vi.mocked(mockParser.parse).mockReturnValueOnce(normalizedEvent1).mockReturnValueOnce(normalizedEvent2);
       vi.mocked(mockPublisher.publish).mockResolvedValue(undefined);
 
-      await handler.handle(rawMessage1);
-      await handler.handle(rawMessage2);
+      await usecase.execute(rawMessage1);
+      await usecase.execute(rawMessage2);
 
       expect(mockParser.parse).toHaveBeenCalledTimes(2);
       expect(mockPublisher.publish).toHaveBeenCalledTimes(2);

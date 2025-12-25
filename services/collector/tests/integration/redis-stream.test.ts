@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { NormalizedEvent } from '@/domain/types';
-import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
+import { StreamRepository } from '@/infra/redis/StreamRepository';
 
 /**
  * 統合テスト: Redis Stream へのデータ配信確認
@@ -14,11 +14,11 @@ import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';
 describe('Redis Stream Integration Tests', () => {
   const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379/0';
   let redis: Redis;
-  let publisher: RedisPublisher;
+  let publisher: StreamRepository;
 
   beforeAll(() => {
     redis = new Redis(REDIS_URL);
-    publisher = new RedisPublisher(REDIS_URL);
+    publisher = new StreamRepository(REDIS_URL);
   });
 
   afterAll(async () => {

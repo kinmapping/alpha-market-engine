@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ReconnectManager } from '@/infrastructure/reconnect/ReconnectManager';
+import { ReconnectManager } from '@/infra/reconnect/ReconnectManager';
 
 /**
  * 単体テスト: ReconnectManager

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StandardWebSocketConnection } from '@/infrastructure/websocket/StandardWebSocketConnection';
+import { StandardWebSocketConnection } from '@/infra/websocket/StandardWebSocketConnection';
 
 /**
  * 単体テスト: WebSocketConnection

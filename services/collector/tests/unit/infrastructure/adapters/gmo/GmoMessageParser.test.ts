@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GmoMessageParser } from '@/infrastructure/adapters/gmo/GmoMessageParser';
-import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/types/GmoRawMessage';
+import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
+import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 
 /**
  * 単体テスト: GmoMessageParser

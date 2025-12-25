@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { NormalizedEvent } from '@/domain/types';
-import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
+import { StreamRepository } from '@/infra/redis/StreamRepository';
 
 // ioredis をモック
 const mockXadd = vi.fn().mockResolvedValue('1234567890-0');
@@ -26,8 +26,8 @@ vi.mock('ioredis', () => {
  * - Stream名の取得ロジック
  * - close() の動作
  */
-describe('RedisPublisher', () => {
-  let publisher: RedisPublisher;
+describe('StreamRepository', () => {
+  let publisher: StreamRepository;
 
   beforeEach(() => {
     // モックをリセット
@@ -38,7 +38,7 @@ describe('RedisPublisher', () => {
 
     vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    publisher = new RedisPublisher('redis://localhost:6379/0');
+    publisher = new StreamRepository('redis://localhost:6379/0');
   });
 
   afterEach(() => {
@@ -175,7 +175,7 @@ describe('RedisPublisher', () => {
       await publisher.publish(event);
 
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('[RedisPublisher] published to stream: md:ticker')
+        expect.stringContaining('[StreamRepository] published to stream: md:ticker')
       );
     });
   });

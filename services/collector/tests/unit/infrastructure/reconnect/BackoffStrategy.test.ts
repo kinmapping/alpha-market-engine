@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { BackoffStrategy } from '@/infrastructure/reconnect/BackoffStrategy';
+import { BackoffStrategy } from '@/infra/reconnect/BackoffStrategy';
 
 /**
  * 単体テスト: BackoffStrategy

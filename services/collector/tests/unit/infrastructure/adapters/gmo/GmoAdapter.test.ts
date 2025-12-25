@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MessageHandler } from '@/application/interfaces/MessageHandler';
-import { GmoAdapter } from '@/infrastructure/adapters/gmo/GmoAdapter';
-import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/types/GmoRawMessage';
-import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
+import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
+import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
+import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
 
 // GmoWebSocketClient をモック
 const mockConnect = vi.fn();
@@ -10,7 +9,7 @@ const mockSubscribe = vi.fn();
 const mockDisconnect = vi.fn();
 const mockParseMessage = vi.fn();
 
-vi.mock('@/infrastructure/adapters/gmo/GmoWebSocketClient', () => {
+vi.mock('@/infra/adapters/gmo/GmoWebSocketClient', () => {
   class MockGmoWebSocketClient {
     async connect(wsUrl: string): Promise<WebSocketConnection> {
       return mockConnect(wsUrl);
@@ -34,41 +33,17 @@ vi.mock('@/infrastructure/adapters/gmo/GmoWebSocketClient', () => {
   };
 });
 
-// ReconnectManager をモック
-const mockStart = vi.fn();
-const mockStop = vi.fn();
-const mockScheduleReconnect = vi.fn();
-
-vi.mock('@/infrastructure/reconnect/ReconnectManager', () => {
-  class MockReconnectManager {
-    async start(): Promise<void> {
-      return mockStart();
-    }
-
-    stop(): void {
-      mockStop();
-    }
-
-    scheduleReconnect(): void {
-      mockScheduleReconnect();
-    }
-  }
-
-  return {
-    ReconnectManager: MockReconnectManager,
-  };
-});
-
 /**
  * 単体テスト: GmoAdapter
  *
  * 優先度: 中
- * - コンストラクタ、start(), connect(), disconnect() の動作確認
- * - handleMessage() のエラーハンドリング
- * - 再接続ロジックとの連携
+ * - コンストラクタ、connect(), disconnect() の動作確認
+ * - メッセージコールバックの動作確認
  */
 describe('GmoAdapter', () => {
-  let mockMessageHandler: MessageHandler;
+  let mockOnMessage: (data: string | ArrayBuffer | Blob) => Promise<void>;
+  let mockOnClose: () => void;
+  let mockOnError: (event: Event) => void;
   let mockConnection: WebSocketConnection;
   let adapter: GmoAdapter;
   const symbol = 'BTC_JPY';
@@ -80,10 +55,10 @@ describe('GmoAdapter', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // MessageHandler のモック
-    mockMessageHandler = {
-      handle: vi.fn().mockResolvedValue(undefined),
-    };
+    // コールバックのモック
+    mockOnMessage = vi.fn().mockResolvedValue(undefined);
+    mockOnClose = vi.fn();
+    mockOnError = vi.fn();
 
     // WebSocketConnection のモック
     mockConnection = {
@@ -102,15 +77,11 @@ describe('GmoAdapter', () => {
     mockSubscribe.mockClear();
     mockDisconnect.mockClear();
     mockParseMessage.mockClear();
-    mockStart.mockClear();
-    mockStop.mockClear();
-    mockScheduleReconnect.mockClear();
 
     // デフォルトの動作を設定
     mockConnect.mockResolvedValue(mockConnection);
-    mockStart.mockResolvedValue(undefined);
 
-    adapter = new GmoAdapter(symbol, wsUrl, mockMessageHandler);
+    adapter = new GmoAdapter(symbol, wsUrl, mockOnMessage, mockOnClose, mockOnError);
   });
 
   afterEach(() => {
@@ -121,14 +92,6 @@ describe('GmoAdapter', () => {
   describe('コンストラクタ', () => {
     it('依存関係を正しく注入する', () => {
       expect(adapter).toBeInstanceOf(GmoAdapter);
-    });
-  });
-
-  describe('start()', () => {
-    it('ReconnectManager.start() を呼び出す', async () => {
-      await adapter.start();
-
-      expect(mockStart).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -187,7 +150,7 @@ describe('GmoAdapter', () => {
         onCloseCallback();
       }
 
-      expect(mockScheduleReconnect).toHaveBeenCalled();
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] socket closed'));
     });
 
@@ -206,16 +169,11 @@ describe('GmoAdapter', () => {
       }
 
       expect(console.error).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] socket error'), errorEvent);
+      expect(mockOnError).toHaveBeenCalledWith(errorEvent);
     });
   });
 
   describe('disconnect()', () => {
-    it('ReconnectManager.stop() を呼び出す', () => {
-      adapter.disconnect();
-
-      expect(mockStop).toHaveBeenCalledTimes(1);
-    });
-
     it('接続が存在する場合、接続を切断する', async () => {
       const connectPromise = adapter.connect();
       await vi.advanceTimersByTimeAsync(500);
@@ -229,110 +187,44 @@ describe('GmoAdapter', () => {
 
     it('接続が null の場合、エラーを投げない', () => {
       expect(() => adapter.disconnect()).not.toThrow();
-      expect(mockStop).toHaveBeenCalled();
       expect(mockDisconnect).toHaveBeenCalled();
     });
   });
 
-  describe('handleMessage()', () => {
+  describe('メッセージ処理', () => {
     it('正常なメッセージを処理する', async () => {
       const connectPromise = adapter.connect();
       await vi.advanceTimersByTimeAsync(500);
       await connectPromise;
 
-      const rawMessage: GmoRawMessage = {
-        channel: 'ticker',
-        symbol: 'BTC_JPY',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        last: 1000000,
-        bid: 999000,
-        ask: 1001000,
-        volume: 1.5,
-      };
-
-      mockParseMessage.mockReturnValue(rawMessage);
+      const messageData = '{"channel":"ticker","symbol":"BTC_JPY"}';
 
       // onMessage コールバックを取得して実行
       const onMessageCallback = vi.mocked(mockConnection.onMessage).mock.calls[0]?.[0] as
         | ((data: string | ArrayBuffer | Blob) => void)
         | undefined;
       if (onMessageCallback) {
-        await onMessageCallback(JSON.stringify(rawMessage));
+        await onMessageCallback(messageData);
       }
 
-      expect(mockParseMessage).toHaveBeenCalled();
-      expect(mockMessageHandler.handle).toHaveBeenCalledWith(rawMessage);
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoAdapter] received message: channel=ticker')
-      );
+      expect(mockOnMessage).toHaveBeenCalledWith(messageData);
     });
 
-    it('パースに失敗した場合、メッセージを無視する', async () => {
+    it('メッセージを受信した場合、onMessage コールバックを呼び出す', async () => {
       const connectPromise = adapter.connect();
       await vi.advanceTimersByTimeAsync(500);
       await connectPromise;
 
-      mockParseMessage.mockReturnValue(null);
+      const messageData = 'invalid message';
 
       const onMessageCallback = vi.mocked(mockConnection.onMessage).mock.calls[0]?.[0] as
         | ((data: string | ArrayBuffer | Blob) => void)
         | undefined;
       if (onMessageCallback) {
-        await onMessageCallback('invalid message');
+        await onMessageCallback(messageData);
       }
 
-      expect(mockParseMessage).toHaveBeenCalled();
-      expect(mockMessageHandler.handle).not.toHaveBeenCalled();
-    });
-
-    it('エラーメッセージ（ERR-5003）の場合、ログに記録して処理を中断する', async () => {
-      const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
-      await connectPromise;
-
-      const errorMessage: GmoRawMessage = {
-        error: 'ERR-5003 Request too many.',
-      };
-
-      mockParseMessage.mockReturnValue(errorMessage);
-
-      const onMessageCallback = vi.mocked(mockConnection.onMessage).mock.calls[0]?.[0] as
-        | ((data: string | ArrayBuffer | Blob) => void)
-        | undefined;
-      if (onMessageCallback) {
-        await onMessageCallback(JSON.stringify(errorMessage));
-      }
-
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] API error: ERR-5003'));
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] Rate limit error detected'));
-      expect(mockMessageHandler.handle).not.toHaveBeenCalled();
-    });
-
-    it('channel がないメッセージの場合、無視する', async () => {
-      const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
-      await connectPromise;
-
-      // channel プロパティが undefined のメッセージ
-      const invalidMessage = {
-        symbol: 'BTC_JPY',
-        channel: undefined,
-      } as unknown as GmoRawMessage;
-
-      mockParseMessage.mockReturnValue(invalidMessage);
-
-      const onMessageCallback = vi.mocked(mockConnection.onMessage).mock.calls[0]?.[0] as
-        | ((data: string | ArrayBuffer | Blob) => void)
-        | undefined;
-      if (onMessageCallback) {
-        await onMessageCallback(JSON.stringify(invalidMessage));
-      }
-
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoAdapter] message missing channel'),
-        invalidMessage
-      );
-      expect(mockMessageHandler.handle).not.toHaveBeenCalled();
+      expect(mockOnMessage).toHaveBeenCalledWith(messageData);
     });
   });
 });

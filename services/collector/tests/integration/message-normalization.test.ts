@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { NormalizedEvent } from '@/domain/types';
-import { GmoMessageParser } from '@/infrastructure/adapters/gmo/GmoMessageParser';
-import type { GmoRawMessage } from '@/infrastructure/adapters/gmo/types/GmoRawMessage';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
+import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
+import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 
 /**
  * 統合テスト: メッセージ正規化の確認
