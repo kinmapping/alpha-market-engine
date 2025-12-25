@@ -1,4 +1,4 @@
-import { BackoffStrategy } from '@/infrastructure/reconnect/BackoffStrategy';
+import { BackoffStrategy } from '@/infra/reconnect/BackoffStrategy';
 
 /**
  * インフラ層: 再接続スケジューラ（connect 関数を受け取って再試行）

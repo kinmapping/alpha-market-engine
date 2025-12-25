@@ -1,5 +1,5 @@
 import type { MessageParser } from '@/application/interfaces/MessageParser';
-import type { NormalizedEvent } from '@/domain/types';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
 import type { GmoRawMessage } from './types/GmoRawMessage';
 
 /**

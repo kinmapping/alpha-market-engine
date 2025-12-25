@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from '@/domain/types';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
 
 /**
  * メッセージパーサーのインターフェイス（インフラ層で実装される）。

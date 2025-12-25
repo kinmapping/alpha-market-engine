@@ -1,13 +1,13 @@
 import Redis from 'ioredis';
-import type { EventPublisher } from '@/application/interfaces/EventPublisher';
-import type { NormalizedEvent } from '@/domain/types';
+import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
+import type { StreamPublisher } from '@/domain/repositories/StreamPublisher';
 
 /**
  * インフラ層: Redis Stream への書き込み実装
  *
  * 責務: NormalizedEvent を Redis Stream に XADD する（実装の詳細を担当）。
  */
-export class RedisPublisher implements EventPublisher {
+export class StreamRepository implements StreamPublisher {
   private readonly redis: Redis;
 
   constructor(redisUrl: string) {
@@ -30,7 +30,7 @@ export class RedisPublisher implements EventPublisher {
 
     // XADD コマンドでメッセージを追加
     await this.redis.xadd(stream, '*', ...Object.entries(payload).flat());
-    console.log(`[RedisPublisher] published to stream: ${stream}, type: ${event.type}, symbol: ${event.symbol}`);
+    console.log(`[StreamRepository] published to stream: ${stream}, type: ${event.type}, symbol: ${event.symbol}`);
   }
 
   /**

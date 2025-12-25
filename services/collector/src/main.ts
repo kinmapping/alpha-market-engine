@@ -1,9 +1,10 @@
 import 'dotenv/config';
 import process from 'node:process';
-import { DefaultMessageHandler } from '@/application/handlers/DefaultMessageHandler';
-import { GmoAdapter } from '@/infrastructure/adapters/gmo/GmoAdapter';
-import { GmoMessageParser } from '@/infrastructure/adapters/gmo/GmoMessageParser';
-import { RedisPublisher } from '@/infrastructure/redis/RedisPublisher';
+import { PublishStreamUsecase } from '@/application/usecases/PublishStreamUsecase';
+import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
+import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
+import { StreamRepository } from '@/infra/redis/StreamRepository';
+import { WebSocketHandler } from '@/presentation/websocket/WebSocketHandler';
 
 /**
  * 必須環境変数を取得する。未設定の場合はエラーを投げる。
@@ -41,27 +42,50 @@ async function bootstrap(): Promise<void> {
     throw new Error(`Unsupported exchange: ${EXCHANGE_NAME}`);
   }
 
-  // インフラ層: Redis Publisher を生成
-  const publisher = new RedisPublisher(REDIS_URL);
+  // インフラ層: Stream Repository を生成
+  const publisher = new StreamRepository(REDIS_URL);
 
-  // アプリケーション層: メッセージハンドラを生成（正規化→配信のフローを組み立てる）
+  // アプリケーション層: ストリーム配信ユースケースを生成（正規化→配信のフローを組み立てる）
   const parser = new GmoMessageParser();
-  const messageHandler = new DefaultMessageHandler(parser, publisher);
+  const usecase = new PublishStreamUsecase(parser, publisher);
 
-  // インフラ層: SYMBOLS (カンマ区切り) から複数ペア対応のアダプタを生成
+  // インフラ層: SYMBOLS (カンマ区切り) から複数ペア対応のハンドラを生成
   const symbols = SYMBOLS.split(',')
     .map((symbol) => symbol.trim())
     .filter(Boolean);
-  const adapters = symbols.map((symbol) => new GmoAdapter(symbol, WS_PUBLIC_URL, messageHandler));
 
-  // すべてのアダプタを並列で起動し、WebSocket 接続を張る。
-  await Promise.all(adapters.map((adapter) => adapter.start()));
+  const handlers = symbols.map((symbol) => {
+    // 1. GmoAdapter を先に作成（コールバックは後から設定）
+    const adapter = new GmoAdapter(symbol, WS_PUBLIC_URL);
+
+    // 2. WebSocketHandler を作成
+    const handler = new WebSocketHandler(adapter, usecase);
+
+    // 3. コールバックを設定（handler が作成済みなので安全に参照できる）
+    adapter.setOnMessage(async (data) => {
+      await handler.handleMessage(data);
+    });
+
+    adapter.setOnClose(() => {
+      handler.reconnectManager.scheduleReconnect();
+    });
+
+    adapter.setOnError((event) => {
+      console.error(`[main] socket error for ${symbol}:`, event);
+      handler.reconnectManager.scheduleReconnect();
+    });
+
+    return handler;
+  });
+
+  // すべてのハンドラを並列で起動し、WebSocket 接続を張る。
+  await Promise.all(handlers.map((handler) => handler.start()));
 
   const shutdown = async () => {
     console.log('Shutting down collector...');
-    // SIGINT/SIGTERM で全アダプタを切断し Redis クライアントも閉じる。
-    for (const adapter of adapters) {
-      adapter.disconnect();
+    // SIGINT/SIGTERM で全ハンドラを切断し Redis クライアントも閉じる。
+    for (const handler of handlers) {
+      handler.disconnect();
     }
     await publisher.close();
     process.exit(0);

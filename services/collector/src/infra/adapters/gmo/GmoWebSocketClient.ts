@@ -1,5 +1,5 @@
-import type { WebSocketConnection } from '@/infrastructure/websocket/interfaces/WebSocketConnection';
-import { StandardWebSocketConnection } from '@/infrastructure/websocket/StandardWebSocketConnection';
+import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
+import { StandardWebSocketConnection } from '@/infra/websocket/StandardWebSocketConnection';
 import type { GmoCommand } from './types/GmoCommand';
 import type { GmoRawMessage } from './types/GmoRawMessage';
 
