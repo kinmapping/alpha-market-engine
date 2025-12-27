@@ -52,10 +52,17 @@ collector は以下の責務を持つ:
 
 - **ioredis**: Redis Stream の操作に最適
 
+### ログライブラリ
+
+- **pino**: 構造化ログ（JSON形式）
+  - 非同期I/Oで高速
+  - 開発環境では `pino-pretty` を使用して人間可読形式で出力
+  - 本番環境では JSON 形式で出力
+  - 環境変数 `LOG_LEVEL` でログレベルを制御（debug, info, warn, error）
+
 ### その他
 
 - **dotenv**: 環境変数管理
-- **winston / pino**: 構造化ログ
 - **zod**: ランタイム型検証
 
 ---
@@ -311,6 +318,7 @@ collector/
     │       └── WebSocketHandler.ts      (WS接続の維持・メッセージ受信・再接続管理)
     ├── application/  (ビジネスプロセスの制御)
     │   ├── interfaces/
+    │   │   ├── Logger.ts                 (ロガーインターフェース)
     │   │   ├── MarketDataAdapter.ts      (取引所アダプタのインターフェース)
     │   │   └── MessageParser.ts          (メッセージパーサーのインターフェース)
     │   └── usecases/
@@ -329,6 +337,9 @@ collector/
         │       └── types/
         │           ├── GmoCommand.ts     (GMOコマンドの型定義)
         │           └── GmoRawMessage.ts  (GMO生メッセージの型定義)
+        ├── logger/
+        │   ├── LoggerFactory.ts          (ロガーファクトリー・シングルトン管理)
+        │   └── PinoLogger.ts             (pino実装・構造化ログ出力)
         ├── reconnect/
         │   ├── ReconnectManager.ts       (再接続管理)
         │   └── BackoffStrategy.ts        (指数バックオフ戦略)
@@ -617,6 +628,66 @@ Redis Stream の各エントリは以下の形式:
 - **バッチ処理**: 複数メッセージをまとめて配信（オプション）
 - **圧縮**: 大きなメッセージ（orderbook など）は圧縮を検討
 - **優先度**: ticker を最優先で配信
+
+---
+
+## ロガー設計
+
+### 概要
+
+collector サービスでは **pino** を使用した構造化ログを採用しています。
+また、テスト時にモックを注入しやすいように各コンポーネントに logger インスタンスを注入している。
+
+### 特徴
+
+- **構造化ログ（JSON形式）**: メタデータを構造化して検索・集計しやすい
+- **ログレベル制御**: 環境変数 `LOG_LEVEL` で制御（debug, info, warn, error）
+- **子ロガー（Child Logger）**: コンポーネントごとにコンテキスト（component, symbol など）を自動付与
+- **環境別出力**: 開発環境では人間可読形式、本番環境では JSON 形式
+
+### ロガーインターフェース
+
+```typescript
+export interface Logger {
+  debug(msg: string, meta?: object): void;
+  info(msg: string, meta?: object): void;
+  warn(msg: string, meta?: object): void;
+  error(msg: string, meta?: object): void;
+  child(bindings: object): Logger;
+}
+```
+
+### 使用例
+
+```typescript
+// ルートロガーの作成
+const rootLogger = LoggerFactory.create();
+
+// 子ロガーの作成（コンテキストを自動付与）
+const adapterLogger = rootLogger.child({ component: 'GmoAdapter', symbol: 'BTC_JPY' });
+
+// ログ出力
+adapterLogger.info('subscribed to channel', { channel: 'ticker' });
+adapterLogger.error('socket error', { err: error, event });
+```
+
+### 環境変数
+
+- `LOG_LEVEL`: ログレベル（debug, info, warn, error）。デフォルトは `info`
+- `NODE_ENV`: 環境（production の場合は JSON 形式、それ以外は pretty 形式）
+
+### ログ出力例
+
+**開発環境（pretty形式）**:
+```
+[2024-01-01 12:00:00.000] INFO (GmoAdapter/BTC_JPY): subscribed to channel
+    channel: "ticker"
+```
+
+**本番環境（JSON形式）**:
+```json
+{"level":30,"time":1704067200000,"component":"GmoAdapter","symbol":"BTC_JPY","channel":"ticker","msg":"subscribed to channel"}
+```
 
 ---
 

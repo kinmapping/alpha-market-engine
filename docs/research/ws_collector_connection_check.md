@@ -426,6 +426,81 @@ const logger = process.env.NODE_ENV === 'production'
 結論: このプロジェクトでは pino の導入を推奨します。特に構造化ログとログレベル制御が、複数シンボル・複数取引所対応時に有効です。
 
 
+### ログ出力ファイルについて
+
+```typescript:services/collector/src/infra/logger/PinoLogger.ts
+// 現在の実装
+this.pinoLogger = pino({
+  level,
+  // destination が指定されていない = デフォルトで stdout に出力
+});
+```
+
+現在は:
+- 開発環境: `pino-pretty` で `stdout` に出力
+- 本番環境: JSON形式で `stdout` に出力
+- ファイル出力: 未実装
+
+#### Docker環境での動作
+
+Dockerコンテナで実行する場合:
+- `stdout` への出力は `docker logs` で確認可能
+- ログローテーションは Docker のログドライバーで管理可能
+
+#### ファイル出力が必要な場合の実装案
+
+ファイル出力が必要なら、以下のように実装できます：
+
+```typescript
+// PinoLogger.ts の修正案
+constructor(options?: { level?: string; pretty?: boolean; destination?: string }) {
+  const level = options?.level ?? process.env.LOG_LEVEL ?? 'info';
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const usePretty = options?.pretty ?? isDevelopment;
+  const destination = options?.destination ?? process.env.LOG_FILE;
+
+  const pinoOptions: pino.LoggerOptions = {
+    level,
+  };
+
+  if (destination) {
+    // ファイル出力を指定
+    const destinationStream = pino.destination(destination);
+    this.pinoLogger = pino(pinoOptions, destinationStream);
+  } else if (usePretty) {
+    // 開発環境: pino-pretty を使用
+    this.pinoLogger = pino({
+      ...pinoOptions,
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'HH:MM:ss.l',
+          ignore: 'pid,hostname',
+        },
+      },
+    });
+  } else {
+    // 本番環境: JSON 形式で stdout に出力
+    this.pinoLogger = pino(pinoOptions);
+  }
+}
+```
+
+環境変数例:
+```bash
+LOG_FILE=/var/log/collector/app.log  # ファイル出力を指定
+```
+
+#### 推奨事項
+
+Docker環境では:
+- `stdout` への出力で十分（`docker logs` で確認可能）
+- ログローテーションは Docker のログドライバーで管理
+- ファイル出力が必要な場合のみ実装を追加
+
+現時点ではファイル出力の実装は不要と判断できますが、必要に応じて上記の実装を追加できます。
+
 
 ## メトリクス集計
 
