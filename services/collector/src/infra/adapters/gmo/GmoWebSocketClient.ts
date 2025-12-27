@@ -1,3 +1,5 @@
+import type { Logger } from '@/application/interfaces/Logger';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
 import { StandardWebSocketConnection } from '@/infra/websocket/StandardWebSocketConnection';
 import type { GmoCommand } from './types/GmoCommand';
@@ -12,7 +14,15 @@ import type { GmoRawMessage } from './types/GmoRawMessage';
  */
 export class GmoWebSocketClient {
   private connection: WebSocketConnection | null = null;
+  private readonly logger: Logger;
   private readonly SUBSCRIPTION_INTERVAL = 1000; // 1秒
+
+  /**
+   * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）
+   */
+  constructor(logger?: Logger) {
+    this.logger = logger ?? LoggerFactory.create();
+  }
 
   /**
    * WebSocket 接続を確立する。
@@ -58,7 +68,7 @@ export class GmoWebSocketClient {
         symbol,
       };
       connection.send(JSON.stringify(command));
-      console.log(`[GmoWebSocketClient] subscribed to ${channel} for ${symbol}`);
+      this.logger.info('subscribed to channel', { channel, symbol });
 
       // 最後のリクエスト以外は待機（1秒間隔）
       if (i < channels.length - 1) {
@@ -98,7 +108,7 @@ export class GmoWebSocketClient {
       }
       return JSON.parse(text) as GmoRawMessage;
     } catch (error) {
-      console.error('[GmoWebSocketClient] failed to parse message:', error);
+      this.logger.error('failed to parse message', { err: error });
       return null;
     }
   }

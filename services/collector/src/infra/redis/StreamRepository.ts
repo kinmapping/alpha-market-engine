@@ -1,6 +1,8 @@
 import Redis from 'ioredis';
+import type { Logger } from '@/application/interfaces/Logger';
 import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
 import type { StreamPublisher } from '@/domain/repositories/StreamPublisher';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 
 /**
  * インフラ層: Redis Stream への書き込み実装
@@ -9,9 +11,15 @@ import type { StreamPublisher } from '@/domain/repositories/StreamPublisher';
  */
 export class StreamRepository implements StreamPublisher {
   private readonly redis: Redis;
+  private readonly logger: Logger;
 
-  constructor(redisUrl: string) {
+  /**
+   * @param redisUrl Redis 接続 URL
+   * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）
+   */
+  constructor(redisUrl: string, logger?: Logger) {
     this.redis = new Redis(redisUrl);
+    this.logger = logger ?? LoggerFactory.create();
   }
 
   /**
@@ -30,7 +38,8 @@ export class StreamRepository implements StreamPublisher {
 
     // XADD コマンドでメッセージを追加
     await this.redis.xadd(stream, '*', ...Object.entries(payload).flat());
-    console.log(`[StreamRepository] published to stream: ${stream}, type: ${event.type}, symbol: ${event.symbol}`);
+    // DEBUG:デバッグ確認(メトリクス集計処理に委譲する)
+    // this.logger.debug('published to stream', { stream, type: event.type, symbol: event.symbol });
   }
 
   /**

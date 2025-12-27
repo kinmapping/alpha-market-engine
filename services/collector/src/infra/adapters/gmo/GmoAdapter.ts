@@ -1,6 +1,18 @@
+import type { Logger } from '@/application/interfaces/Logger';
 import type { MarketDataAdapter } from '@/application/interfaces/MarketDataAdapter';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
 import { GmoWebSocketClient } from './GmoWebSocketClient';
+
+/**
+ * GmoAdapter の初期化オプション
+ */
+interface GmoAdapterOptions {
+  logger?: Logger;
+  onMessage?: (data: string | ArrayBuffer | Blob) => Promise<void>;
+  onClose?: () => void;
+  onError?: (event: Event) => void;
+}
 
 /**
  * インフラ層: MarketDataAdapter 実装
@@ -10,6 +22,7 @@ import { GmoWebSocketClient } from './GmoWebSocketClient';
 export class GmoAdapter implements MarketDataAdapter {
   private connection: WebSocketConnection | null = null;
   private readonly webSocketClient: GmoWebSocketClient;
+  private readonly logger: Logger;
   private readonly CONNECTION_DELAY = 500; // 接続確立後の待機時間（ミリ秒）
 
   private onMessageCallback?: (data: string | ArrayBuffer | Blob) => Promise<void>;
@@ -20,21 +33,18 @@ export class GmoAdapter implements MarketDataAdapter {
    * GmoAdapter を初期化する。
    * @param symbol 取引ペア（例: 'BTC_JPY'）
    * @param wsUrl GMO コインの WebSocket エンドポイント URL
-   * @param onMessage メッセージ受信時のコールバック（オプショナル、後から setOnMessage で設定可能）
-   * @param onClose 接続切断時のコールバック（オプショナル、後から setOnClose で設定可能）
-   * @param onError エラー発生時のコールバック（オプショナル、後から setOnError で設定可能）
+   * @param options オプション（ロガー、コールバック関数など）
    */
   constructor(
     private readonly symbol: string,
     private readonly wsUrl: string,
-    onMessage?: (data: string | ArrayBuffer | Blob) => Promise<void>,
-    onClose?: () => void,
-    onError?: (event: Event) => void
+    options?: GmoAdapterOptions
   ) {
-    this.webSocketClient = new GmoWebSocketClient();
-    if (onMessage) this.onMessageCallback = onMessage;
-    if (onClose) this.onCloseCallback = onClose;
-    if (onError) this.onErrorCallback = onError;
+    this.logger = options?.logger ?? LoggerFactory.create();
+    this.webSocketClient = new GmoWebSocketClient(this.logger);
+    if (options?.onMessage) this.onMessageCallback = options.onMessage;
+    if (options?.onClose) this.onCloseCallback = options.onClose;
+    if (options?.onError) this.onErrorCallback = options.onError;
   }
 
   /**
@@ -90,7 +100,7 @@ export class GmoAdapter implements MarketDataAdapter {
     await this.webSocketClient.subscribe(this.connection, this.symbol);
 
     this.connection.onClose(() => {
-      console.warn(`[GmoAdapter] socket closed for ${this.symbol}`);
+      this.logger.warn('socket closed', { symbol: this.symbol });
       if (this.onCloseCallback) {
         this.onCloseCallback();
       }
@@ -99,7 +109,7 @@ export class GmoAdapter implements MarketDataAdapter {
     this.connection.onError((event) => {
       // 標準の WebSocket API では Event を返す
       // エラーの詳細は Event オブジェクトからは取得できないため、イベント自体をログに記録
-      console.error(`[GmoAdapter] socket error for ${this.symbol}:`, event);
+      this.logger.error('socket error', { symbol: this.symbol, event });
       if (this.onErrorCallback) {
         this.onErrorCallback(event);
       }

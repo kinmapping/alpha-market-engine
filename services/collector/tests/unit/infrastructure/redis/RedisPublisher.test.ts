@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
 import { StreamRepository } from '@/infra/redis/StreamRepository';
+import { LoggerMock } from '../../helpers/LoggerMock';
 
 // ioredis をモック
 const mockXadd = vi.fn().mockResolvedValue('1234567890-0');
@@ -28,6 +29,7 @@ vi.mock('ioredis', () => {
  */
 describe('StreamRepository', () => {
   let publisher: StreamRepository;
+  let loggerMock: LoggerMock;
 
   beforeEach(() => {
     // モックをリセット
@@ -36,9 +38,9 @@ describe('StreamRepository', () => {
     mockXadd.mockResolvedValue('1234567890-0');
     mockQuit.mockResolvedValue('OK');
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    loggerMock = new LoggerMock();
 
-    publisher = new StreamRepository('redis://localhost:6379/0');
+    publisher = new StreamRepository('redis://localhost:6379/0', loggerMock);
   });
 
   afterEach(() => {
@@ -174,9 +176,12 @@ describe('StreamRepository', () => {
 
       await publisher.publish(event);
 
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('[StreamRepository] published to stream: md:ticker')
-      );
+      // TODO: メトリクス集計処理に統合するため、ログ出力は不要になる
+      // expect(loggerMock.info).toHaveBeenCalledWith('published to stream', {
+      //   stream: 'md:ticker',
+      //   type: 'ticker',
+      //   symbol: 'BTC_JPY',
+      // });
     });
   });
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
+import { LoggerMock } from '../../../helpers/LoggerMock';
 
 // GmoWebSocketClient をモック
 const mockConnect = vi.fn();
@@ -46,14 +47,13 @@ describe('GmoAdapter', () => {
   let mockOnError: (event: Event) => void;
   let mockConnection: WebSocketConnection;
   let adapter: GmoAdapter;
+  let loggerMock: LoggerMock;
   const symbol = 'BTC_JPY';
   const wsUrl = 'wss://api.coin.z.com/ws/public/v1';
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    loggerMock = new LoggerMock();
 
     // コールバックのモック
     mockOnMessage = vi.fn().mockResolvedValue(undefined);
@@ -81,7 +81,12 @@ describe('GmoAdapter', () => {
     // デフォルトの動作を設定
     mockConnect.mockResolvedValue(mockConnection);
 
-    adapter = new GmoAdapter(symbol, wsUrl, mockOnMessage, mockOnClose, mockOnError);
+    adapter = new GmoAdapter(symbol, wsUrl, {
+      logger: loggerMock,
+      onMessage: mockOnMessage,
+      onClose: mockOnClose,
+      onError: mockOnError,
+    });
   });
 
   afterEach(() => {
@@ -151,7 +156,7 @@ describe('GmoAdapter', () => {
       }
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
-      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] socket closed'));
+      expect(loggerMock.warn).toHaveBeenCalledWith('socket closed', { symbol });
     });
 
     it('エラーが発生した場合、ログに記録する', async () => {
@@ -168,7 +173,7 @@ describe('GmoAdapter', () => {
         onErrorCallback(errorEvent);
       }
 
-      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('[GmoAdapter] socket error'), errorEvent);
+      expect(loggerMock.error).toHaveBeenCalledWith('socket error', { symbol, event: errorEvent });
       expect(mockOnError).toHaveBeenCalledWith(errorEvent);
     });
   });

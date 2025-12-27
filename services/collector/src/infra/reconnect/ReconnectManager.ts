@@ -1,3 +1,5 @@
+import type { Logger } from '@/application/interfaces/Logger';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import { BackoffStrategy } from '@/infra/reconnect/BackoffStrategy';
 
 /**
@@ -9,11 +11,18 @@ export class ReconnectManager {
   private readonly backoff = new BackoffStrategy();
   private reconnectTimer: NodeJS.Timeout | null = null;
   private stopped = false;
+  private readonly logger: Logger;
 
   /**
    * @param connectFn 再接続時に実行する接続関数
+   * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）
    */
-  constructor(private readonly connectFn: () => Promise<void>) {}
+  constructor(
+    private readonly connectFn: () => Promise<void>,
+    logger?: Logger
+  ) {
+    this.logger = logger ?? LoggerFactory.create();
+  }
 
   /**
    * 再接続管理を開始する。
@@ -60,7 +69,7 @@ export class ReconnectManager {
       await this.connectFn();
       this.backoff.reset();
     } catch (error) {
-      console.error('Reconnect attempt failed:', error);
+      this.logger.error('Reconnect attempt failed', { err: error });
       this.scheduleReconnect();
     }
   }
