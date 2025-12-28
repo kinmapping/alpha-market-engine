@@ -1,6 +1,8 @@
+import type { Logger } from '@/application/interfaces/Logger';
 import type { MarketDataAdapter } from '@/application/interfaces/MarketDataAdapter';
 import type { PublishStreamUsecase } from '@/application/usecases/PublishStreamUsecase';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import { ReconnectManager } from '@/infra/reconnect/ReconnectManager';
 
 /**
@@ -13,15 +15,18 @@ import { ReconnectManager } from '@/infra/reconnect/ReconnectManager';
  */
 export class WebSocketHandler {
   readonly reconnectManager: ReconnectManager;
+  private readonly logger: Logger;
 
   constructor(
     private readonly adapter: MarketDataAdapter & {
       parseMessage?: (data: string | ArrayBuffer | Blob) => GmoRawMessage | null;
     },
-    private readonly usecase: PublishStreamUsecase
+    private readonly usecase: PublishStreamUsecase,
+    logger?: Logger
   ) {
+    this.logger = logger ?? LoggerFactory.create();
     // ReconnectManager に再接続時のコールバック（adapter.connect メソッド）を渡す
-    this.reconnectManager = new ReconnectManager(() => this.adapter.connect());
+    this.reconnectManager = new ReconnectManager(() => this.adapter.connect(), this.logger);
   }
 
   /**
@@ -61,27 +66,30 @@ export class WebSocketHandler {
         typeof rawMessage.error === 'string'
       ) {
         const errorMsg = rawMessage.error;
-        console.error(`[WebSocketHandler] API error: ${errorMsg}`);
+        this.logger.error('API error', { error: errorMsg });
 
         // ERR-5003 (Request too many) の場合は、購読リクエストの送信間隔が不十分
         if (errorMsg.includes('ERR-5003')) {
-          console.warn('[WebSocketHandler] Rate limit error detected. Consider increasing subscription interval.');
+          this.logger.warn('Rate limit error detected. Consider increasing subscription interval.', {
+            error: errorMsg,
+          });
         }
         return;
       }
 
       // channel がないメッセージは無視
       if (typeof rawMessage === 'object' && rawMessage !== null && !('channel' in rawMessage)) {
-        console.warn('[WebSocketHandler] message missing channel:', rawMessage);
+        this.logger.warn('message missing channel', { rawMessage });
         return;
       }
 
-      // デバッグ: 受信したメッセージのチャンネルをログ出力
-      if (typeof rawMessage === 'object' && rawMessage !== null && 'channel' in rawMessage && 'symbol' in rawMessage) {
-        console.log(
-          `[WebSocketHandler] received message: channel=${String(rawMessage.channel)}, symbol=${String(rawMessage.symbol)}`
-        );
-      }
+      // DEBUG: 受信したメッセージのチャンネルをログ出力(不要になったためコメントアウト、メトリクス集計処理に委譲する)
+      // if (typeof rawMessage === 'object' && rawMessage !== null && 'channel' in rawMessage && 'symbol' in rawMessage) {
+      //   this.logger.debug('received message', {
+      //     channel: String(rawMessage.channel),
+      //     symbol: String(rawMessage.symbol),
+      //   });
+      // }
     }
 
     // ユースケースに処理を委譲（正規化→配信）

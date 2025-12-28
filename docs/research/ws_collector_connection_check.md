@@ -18,47 +18,26 @@ collector が GMO コインの WebSocket API に正常に接続し、データ�
 
 ```
 1:C 25 Nov 2025 21:53:39.640 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
-
 1:C 25 Nov 2025 21:53:39.640 * Redis version=7.4.7, bits=64, commit=00000000, modified=0, pid=1, just started
-
 1:C 25 Nov 2025 21:53:39.640 * Configuration loaded
-
 1:M 25 Nov 2025 21:53:39.640 * monotonic clock: POSIX clock_gettime
-
 1:M 25 Nov 2025 21:53:39.642 * Running mode=standalone, port=6379.
-
 1:M 25 Nov 2025 21:53:39.642 * Server initialized
-
 1:M 25 Nov 2025 21:53:39.643 * Reading RDB base file on AOF loading...
-
 1:M 25 Nov 2025 21:53:39.643 * Loading RDB produced by version 7.4.7
-
 1:M 25 Nov 2025 21:53:39.643 * RDB age 17189 seconds
-
 1:M 25 Nov 2025 21:53:39.643 * RDB memory usage when created 0.94 Mb
-
 1:M 25 Nov 2025 21:53:39.643 * RDB is base AOF
-
 1:M 25 Nov 2025 21:53:39.643 * Done loading RDB, keys loaded: 0, keys expired: 0.
-
 1:M 25 Nov 2025 21:53:39.643 * DB loaded from base file appendonly.aof.1.base.rdb: 0.001 seconds
-
 1:M 25 Nov 2025 21:53:39.645 * DB loaded from incr file appendonly.aof.1.incr.aof: 0.001 seconds
-
 1:M 25 Nov 2025 21:53:39.645 * DB loaded from append only file: 0.002 seconds
-
 1:M 25 Nov 2025 21:53:39.645 * Opening AOF incr file appendonly.aof.1.incr.aof on server start
-
 1:M 25 Nov 2025 21:53:39.645 * Ready to accept connections tcp
-
 1:M 25 Nov 2025 21:58:40.042 * 100 changes in 300 seconds. Saving...
-
 1:M 25 Nov 2025 21:58:40.045 * Background saving started by pid 22
-
 22:C 25 Nov 2025 21:58:40.059 * DB saved on disk
-
 22:C 25 Nov 2025 21:58:40.059 * Fork CoW for RDB: current 0 MB, peak 0 MB, average 0 MB
-
 1:M 25 Nov 2025 21:58:40.156 * Background saving terminated with success
 ```
 
@@ -315,3 +294,11 @@ docker exec redis redis-cli KEYS "md:*"
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/)
 - [Redis Streams ドキュメント](https://redis.io/docs/data-types/streams/)
 
+
+
+
+## メトリクス集計
+
+prom-client
+- /metrics を作る
+- 受信数/sec、Redis遅延、再接続回数を出せる

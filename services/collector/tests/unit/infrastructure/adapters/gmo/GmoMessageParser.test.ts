@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
+import { LoggerMock } from '../../../helpers/LoggerMock';
 
 /**
  * 単体テスト: GmoMessageParser
@@ -13,12 +14,11 @@ import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
  */
 describe('GmoMessageParser', () => {
   let parser: GmoMessageParser;
+  let loggerMock: LoggerMock;
 
   beforeEach(() => {
-    parser = new GmoMessageParser();
-    // console.warn と console.error をモックしてログ出力を抑制
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    loggerMock = new LoggerMock();
+    parser = new GmoMessageParser(loggerMock);
   });
 
   describe('正常系（統合テストでカバー済みだが、単体テストでも確認）', () => {
@@ -278,7 +278,7 @@ describe('GmoMessageParser', () => {
       const normalized = parser.parse(errorMessage);
 
       expect(normalized).toBeNull();
-      expect(console.warn).toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalled();
     });
 
     it('エラーメッセージと channel が両方ある場合、channel を優先する', () => {

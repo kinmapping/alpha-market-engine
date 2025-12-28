@@ -3,6 +3,7 @@ import process from 'node:process';
 import { PublishStreamUsecase } from '@/application/usecases/PublishStreamUsecase';
 import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
 import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import { StreamRepository } from '@/infra/redis/StreamRepository';
 import { WebSocketHandler } from '@/presentation/websocket/WebSocketHandler';
 
@@ -42,11 +43,14 @@ async function bootstrap(): Promise<void> {
     throw new Error(`Unsupported exchange: ${EXCHANGE_NAME}`);
   }
 
-  // インフラ層: Stream Repository を生成
-  const publisher = new StreamRepository(REDIS_URL);
+  // ロガーを初期化
+  const rootLogger = LoggerFactory.create();
+
+  // インフラ層: Stream Repository を生成（ロガーを注入）
+  const publisher = new StreamRepository(REDIS_URL, rootLogger);
 
   // アプリケーション層: ストリーム配信ユースケースを生成（正規化→配信のフローを組み立てる）
-  const parser = new GmoMessageParser();
+  const parser = new GmoMessageParser(rootLogger);
   const usecase = new PublishStreamUsecase(parser, publisher);
 
   // インフラ層: SYMBOLS (カンマ区切り) から複数ペア対応のハンドラを生成
@@ -55,11 +59,15 @@ async function bootstrap(): Promise<void> {
     .filter(Boolean);
 
   const handlers = symbols.map((symbol) => {
-    // 1. GmoAdapter を先に作成（コールバックは後から設定）
-    const adapter = new GmoAdapter(symbol, WS_PUBLIC_URL);
+    // 子ロガーを作成（component と symbol をコンテキストとして付与）
+    const adapterLogger = rootLogger.child({ component: 'GmoAdapter', symbol });
+    const handlerLogger = rootLogger.child({ component: 'WebSocketHandler', symbol });
 
-    // 2. WebSocketHandler を作成
-    const handler = new WebSocketHandler(adapter, usecase);
+    // 1. GmoAdapter を先に作成（子ロガーを注入）
+    const adapter = new GmoAdapter(symbol, WS_PUBLIC_URL, { logger: adapterLogger });
+
+    // 2. WebSocketHandler を作成（子ロガーを注入）
+    const handler = new WebSocketHandler(adapter, usecase, handlerLogger);
 
     // 3. コールバックを設定（handler が作成済みなので安全に参照できる）
     adapter.setOnMessage(async (data) => {
@@ -71,7 +79,7 @@ async function bootstrap(): Promise<void> {
     });
 
     adapter.setOnError((event) => {
-      console.error(`[main] socket error for ${symbol}:`, event);
+      adapterLogger.error('socket error', { event });
       handler.reconnectManager.scheduleReconnect();
     });
 
@@ -82,7 +90,7 @@ async function bootstrap(): Promise<void> {
   await Promise.all(handlers.map((handler) => handler.start()));
 
   const shutdown = async () => {
-    console.log('Shutting down collector...');
+    rootLogger.info('Shutting down collector...');
     // SIGINT/SIGTERM で全ハンドラを切断し Redis クライアントも閉じる。
     for (const handler of handlers) {
       handler.disconnect();
@@ -96,6 +104,7 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((error) => {
-  console.error('Failed to bootstrap collector:', error);
+  const logger = LoggerFactory.create();
+  logger.error('Failed to bootstrap collector', { err: error });
   process.exit(1);
 });

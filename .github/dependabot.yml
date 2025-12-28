@@ -27,11 +27,18 @@ updates:
       dev-dependencies:
         patterns:
           - "@biomejs/biome"
+          - "@eslint/js"
           - "@types/*"
-          - "typescript"
-          - "vitest"
+          - "@typescript-eslint/eslint-plugin"
+          - "@typescript-eslint/parser"
+          - "eslint"
           - "husky"
+          - "jiti"
           - "lint-staged"
+          - "pino-pretty"
+          - "typescript"
+          - "typescript-eslint"
+          - "vitest"
         update-types:
           - "minor"
           - "patch"
@@ -40,8 +47,8 @@ updates:
         patterns:
           - "dotenv"
           - "ioredis"
+          - "pino"
           - "tsx"
-          - "winston"
         update-types:
           - "minor"
           - "patch"

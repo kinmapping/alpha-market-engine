@@ -1,5 +1,7 @@
+import type { Logger } from '@/application/interfaces/Logger';
 import type { MessageParser } from '@/application/interfaces/MessageParser';
 import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
+import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import type { GmoRawMessage } from './types/GmoRawMessage';
 
 /**
@@ -8,6 +10,14 @@ import type { GmoRawMessage } from './types/GmoRawMessage';
  * 責務: GmoRawMessage → NormalizedEvent への変換（ドキュメントの正規化例どおり）。
  */
 export class GmoMessageParser implements MessageParser {
+  private readonly logger: Logger;
+
+  /**
+   * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）
+   */
+  constructor(logger?: Logger) {
+    this.logger = logger ?? LoggerFactory.create();
+  }
   /**
    * GMO 固有のメッセージ形式を共通の NormalizedEvent 形式に変換する。
    * @param rawMessage GMO API から受信したメッセージ
@@ -17,7 +27,7 @@ export class GmoMessageParser implements MessageParser {
     try {
       const message = rawMessage as GmoRawMessage;
       if (!message?.channel) {
-        console.warn('[GmoMessageParser] message missing channel field:', JSON.stringify(rawMessage));
+        this.logger.warn('message missing channel field', { rawMessage: JSON.stringify(rawMessage) });
         return null;
       }
 
@@ -73,7 +83,7 @@ export class GmoMessageParser implements MessageParser {
           return null;
       }
     } catch (error) {
-      console.error('[GmoMessageParser] failed to parse message:', error);
+      this.logger.error('failed to parse message', { err: error });
       return null;
     }
   }

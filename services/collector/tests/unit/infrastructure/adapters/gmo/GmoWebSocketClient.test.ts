@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmoWebSocketClient } from '@/infra/adapters/gmo/GmoWebSocketClient';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
+import { LoggerMock } from '../../../helpers/LoggerMock';
 
 // StandardWebSocketConnection をモック
 const mockOnOpen = vi.fn();
@@ -71,6 +72,7 @@ vi.mock('@/infra/websocket/StandardWebSocketConnection', () => {
  */
 describe('GmoWebSocketClient', () => {
   let client: GmoWebSocketClient;
+  let loggerMock: LoggerMock;
   let mockSocket: {
     addEventListener: ReturnType<typeof vi.fn>;
     send: ReturnType<typeof vi.fn>;
@@ -81,8 +83,7 @@ describe('GmoWebSocketClient', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    loggerMock = new LoggerMock();
 
     // WebSocket のモック
     mockSocket = {
@@ -123,14 +124,11 @@ describe('GmoWebSocketClient', () => {
     mockRemoveAllListeners.mockClear();
     mockTerminate.mockClear();
 
-    client = new GmoWebSocketClient();
+    client = new GmoWebSocketClient(loggerMock);
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    // console のスパイのみをリセット（global.WebSocket は保持）
-    vi.spyOn(console, 'log').mockRestore();
-    vi.spyOn(console, 'error').mockRestore();
     // global.WebSocket は保持（次のテストでも使用するため）
   });
 
@@ -230,10 +228,19 @@ describe('GmoWebSocketClient', () => {
       await vi.advanceTimersByTimeAsync(2000);
       await subscribePromise;
 
-      expect(console.log).toHaveBeenCalledTimes(3);
-      expect(console.log).toHaveBeenNthCalledWith(1, '[GmoWebSocketClient] subscribed to ticker for BTC_JPY');
-      expect(console.log).toHaveBeenNthCalledWith(2, '[GmoWebSocketClient] subscribed to orderbooks for BTC_JPY');
-      expect(console.log).toHaveBeenNthCalledWith(3, '[GmoWebSocketClient] subscribed to trades for BTC_JPY');
+      expect(loggerMock.info).toHaveBeenCalledTimes(3);
+      expect(loggerMock.info).toHaveBeenNthCalledWith(1, 'subscribed to channel', {
+        channel: 'ticker',
+        symbol: 'BTC_JPY',
+      });
+      expect(loggerMock.info).toHaveBeenNthCalledWith(2, 'subscribed to channel', {
+        channel: 'orderbooks',
+        symbol: 'BTC_JPY',
+      });
+      expect(loggerMock.info).toHaveBeenNthCalledWith(3, 'subscribed to channel', {
+        channel: 'trades',
+        symbol: 'BTC_JPY',
+      });
     });
   });
 
@@ -301,7 +308,7 @@ describe('GmoWebSocketClient', () => {
       const parsed = client.parseMessage(invalidJson);
 
       expect(parsed).toBeNull();
-      expect(console.error).toHaveBeenCalled();
+      expect(loggerMock.error).toHaveBeenCalled();
     });
 
     it('パースエラー時にログが出力される', () => {
@@ -309,9 +316,9 @@ describe('GmoWebSocketClient', () => {
 
       client.parseMessage(invalidJson);
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('[GmoWebSocketClient] failed to parse message:'),
-        expect.any(Error)
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        'failed to parse message',
+        expect.objectContaining({ err: expect.any(Error) })
       );
     });
 

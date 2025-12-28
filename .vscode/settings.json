@@ -40,8 +40,30 @@
         {
           "scope": "string.quoted.docstring.multi.python",
           "settings": {
-            "foreground": "#787878", // 薄紫色に変更
-            "fontStyle": "italic" // さらに斜体にもできる
+            "foreground": "#787878",
+            "fontStyle": "italic"
+          }
+        },
+        {
+          // JSDoc全体の説明テキスト部分
+          "scope": "comment.block.documentation.ts",
+          "settings": {
+            "foreground": "#29645f"
+          }
+        },
+        {
+          // JSDoc内の型名（例: {string}）
+          "scope": "variable.other.jsdoc",
+          "settings": {
+            "foreground": "#CE9178"
+          }
+        },
+        {
+          // 単一行コメントの一般的なスコープ
+          "scope": "comment.line.double-slash",
+          "settings": {
+            "foreground": "#787878",
+            "fontStyle": "italic"
           }
         }
       ]
@@ -203,6 +225,7 @@
     "PYTHONPATH",
     "setuptools",
     "trixie",
+    "usecase",
     "usecases",
     "VARCHAR",
     "venv",

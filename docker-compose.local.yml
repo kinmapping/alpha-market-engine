@@ -8,6 +8,7 @@ services:
     build:
       context: ./services/collector
       dockerfile: Dockerfile
+      target: development  # 開発・テスト用ステージを使用
     container_name: collector
     restart: unless-stopped
     env_file:

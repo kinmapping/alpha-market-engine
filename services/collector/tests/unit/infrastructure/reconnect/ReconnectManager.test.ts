@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReconnectManager } from '@/infra/reconnect/ReconnectManager';
+import { LoggerMock } from '../../helpers/LoggerMock';
 
 /**
  * 単体テスト: ReconnectManager
@@ -13,12 +14,13 @@ import { ReconnectManager } from '@/infra/reconnect/ReconnectManager';
 describe('ReconnectManager', () => {
   let mockConnectFn: () => Promise<void>;
   let manager: ReconnectManager;
+  let loggerMock: LoggerMock;
 
   beforeEach(() => {
     vi.useFakeTimers();
     mockConnectFn = vi.fn();
-    manager = new ReconnectManager(mockConnectFn);
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    loggerMock = new LoggerMock();
+    manager = new ReconnectManager(mockConnectFn, loggerMock);
   });
 
   afterEach(() => {
@@ -200,7 +202,7 @@ describe('ReconnectManager', () => {
 
       await manager.start();
 
-      expect(console.error).toHaveBeenCalledWith('Reconnect attempt failed:', error);
+      expect(loggerMock.error).toHaveBeenCalledWith('Reconnect attempt failed', { err: error });
       expect(vi.getTimerCount()).toBe(1);
     });
 
