@@ -1,0 +1,67 @@
+[
+  {
+    "name": "bug",
+    "description": "🐛 バグや不具合",
+    "color": "#d73a4a"
+  },
+  {
+    "name": "documentation",
+    "description": "📝 ドキュメントの改善や追加",
+    "color": "#0075ca"
+  },
+  {
+    "name": "duplicate",
+    "description": "🔀 既に存在する Issue/PR の重複",
+    "color": "#cfd3d7"
+  },
+  {
+    "name": "enhancement",
+    "description": "✨ 新機能や機能改善",
+    "color": "#a2eeef"
+  },
+  {
+    "name": "good first issue",
+    "description": "🌱 初心者向け",
+    "color": "#7057ff"
+  },
+  {
+    "name": "help wanted",
+    "description": "🙏 追加の支援が必要",
+    "color": "#008672"
+  },
+  {
+    "name": "invalid",
+    "description": "❌ 無効または不適切",
+    "color": "#e4e669"
+  },
+  {
+    "name": "question",
+    "description": "💭 質問や情問や情報提供を求める",
+    "color": "#d876e3"
+  },
+  {
+    "name": "wontfix",
+    "description": "🚫 対応しない",
+    "color": "#ffffff"
+  },
+  {
+    "name": "codex",
+    "description": "🤖 Codex 作成",
+    "color": "#ededed"
+  },
+  {
+    "name": "dependencies",
+    "description": "📦 依存関係の更新",
+    "color": "#BFDADC"
+  },
+  {
+    "name": "automated",
+    "description": "🤖 自動化(bot)",
+    "color": "#5319E7"
+  },
+  {
+    "name": "npm",
+    "description": "📦 npm パッケージ",
+    "color": "#1D76DB"
+  }
+]

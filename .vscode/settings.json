@@ -10,6 +10,26 @@
       "statusBar.noFolderBackground": "#242424"
     }
   },
+  "[markdown]": {
+    "editor.wordWrap": "off"
+  },
+  "json.schemas": [
+    {
+      "fileMatch": [".github/labels.json"],
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": "string",
+              "format": "color"
+            }
+          }
+        }
+      }
+    }
+  ],
   "editor.tokenColorCustomizations": {
     "[Default Dark+]": {
       "textMateRules": [
