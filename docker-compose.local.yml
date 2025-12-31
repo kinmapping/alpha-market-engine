@@ -27,6 +27,8 @@ services:
       - redis
     networks:
       - bot-net
+    ports:
+      - "9090:9090"  # メトリクスエンドポイント用
     volumes:
       - ./services/collector/src:/app/src  # ソースコードをマウント
       - ./services/collector/tsconfig.json:/app/tsconfig.json
@@ -135,6 +137,42 @@ services:
       - redis-data:/data
     command: ["redis-server", "--appendonly", "yes"]
 
+  # 7) メトリクス収集（Prometheus）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"  # ホスト側は 9091 を使用（Prometheus のデフォルト 9090 と競合回避）
+    networks:
+      - bot-net
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - collector
+
+  # 8) メトリクス可視化（Grafana）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - bot-net
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+
 networks:
   bot-net:
     driver: bridge
@@ -142,3 +180,5 @@ networks:
 volumes:
   db-data:
   redis-data:
+  prometheus-data:
+  grafana-data:
