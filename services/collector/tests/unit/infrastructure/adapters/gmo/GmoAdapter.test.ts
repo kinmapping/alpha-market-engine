@@ -1,8 +1,8 @@
+import { LoggerMock } from '@test/unit/helpers/mocks/LoggerMock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
-import { LoggerMock } from '../../../helpers/LoggerMock';
 
 // GmoWebSocketClient をモック
 const mockConnect = vi.fn();
