@@ -1,5 +1,6 @@
 import type { Logger } from '@/application/interfaces/Logger';
 import type { MarketDataAdapter } from '@/application/interfaces/MarketDataAdapter';
+import type { MetricsCollector } from '@/application/interfaces/MetricsCollector';
 import type { PublishStreamUsecase } from '@/application/usecases/PublishStreamUsecase';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 import { LoggerFactory } from '@/infra/logger/LoggerFactory';
@@ -22,11 +23,12 @@ export class WebSocketHandler {
       parseMessage?: (data: string | ArrayBuffer | Blob) => GmoRawMessage | null;
     },
     private readonly usecase: PublishStreamUsecase,
-    logger?: Logger
+    logger?: Logger,
+    private readonly metricsCollector?: MetricsCollector
   ) {
     this.logger = logger ?? LoggerFactory.create();
     // ReconnectManager に再接続時のコールバック（adapter.connect メソッド）を渡す
-    this.reconnectManager = new ReconnectManager(() => this.adapter.connect(), this.logger);
+    this.reconnectManager = new ReconnectManager(() => this.adapter.connect(), this.logger, this.metricsCollector);
   }
 
   /**
@@ -50,49 +52,91 @@ export class WebSocketHandler {
    * @param data WebSocket から受信した生データ（string | ArrayBuffer | Blob）
    */
   async handleMessage(data: string | ArrayBuffer | Blob): Promise<void> {
-    // アダプタが parseMessage メソッドを持っている場合、それを使用
-    let rawMessage: unknown = data;
-    if (this.adapter.parseMessage) {
-      rawMessage = this.adapter.parseMessage(data);
-      if (!rawMessage) {
-        return;
-      }
-
-      // エラーメッセージの場合は早期 return（エラーメッセージには channel がない）
-      if (
-        typeof rawMessage === 'object' &&
-        rawMessage !== null &&
-        'error' in rawMessage &&
-        typeof rawMessage.error === 'string'
-      ) {
-        const errorMsg = rawMessage.error;
-        this.logger.error('API error', { error: errorMsg });
-
-        // ERR-5003 (Request too many) の場合は、購読リクエストの送信間隔が不十分
-        if (errorMsg.includes('ERR-5003')) {
-          this.logger.warn('Rate limit error detected. Consider increasing subscription interval.', {
-            error: errorMsg,
-          });
-        }
-        return;
-      }
-
-      // channel がないメッセージは無視
-      if (typeof rawMessage === 'object' && rawMessage !== null && !('channel' in rawMessage)) {
-        this.logger.warn('message missing channel', { rawMessage });
-        return;
-      }
-
-      // DEBUG: 受信したメッセージのチャンネルをログ出力(不要になったためコメントアウト、メトリクス集計処理に委譲する)
-      // if (typeof rawMessage === 'object' && rawMessage !== null && 'channel' in rawMessage && 'symbol' in rawMessage) {
-      //   this.logger.debug('received message', {
-      //     channel: String(rawMessage.channel),
-      //     symbol: String(rawMessage.symbol),
-      //   });
-      // }
+    const rawMessage = this.parseMessage(data);
+    if (!rawMessage) {
+      return;
     }
 
-    // ユースケースに処理を委譲（正規化→配信）
+    if (this.isErrorMessage(rawMessage)) {
+      this.handleErrorMessage(rawMessage as { error: string });
+      return;
+    }
+
+    if (!this.hasChannel(rawMessage)) {
+      this.logger.warn('message missing channel', { rawMessage });
+      return;
+    }
+
+    this.recordReceivedMetrics(rawMessage);
     await this.usecase.execute(rawMessage);
+  }
+
+  /**
+   * メッセージをパースする
+   * @param data 生データ
+   * @returns パースされたメッセージ、パースできない場合は null
+   */
+  private parseMessage(data: string | ArrayBuffer | Blob): unknown | null {
+    if (this.adapter.parseMessage) {
+      return this.adapter.parseMessage(data);
+    }
+    return data;
+  }
+
+  /**
+   * エラーメッセージかどうかを判定
+   * @param message メッセージ
+   * @returns エラーメッセージの場合 true
+   */
+  private isErrorMessage(message: unknown): boolean {
+    return typeof message === 'object' && message !== null && 'error' in message && typeof message.error === 'string';
+  }
+
+  /**
+   * エラーメッセージを処理する
+   * @param message エラーメッセージ
+   */
+  private handleErrorMessage(message: { error: string }): void {
+    const errorMsg = message.error;
+    this.logger.error('API error', { error: errorMsg });
+
+    // メトリクス収集: API エラー
+    if (this.metricsCollector) {
+      this.metricsCollector.incrementError('api_error');
+    }
+
+    // ERR-5003 (Request too many) の場合は、購読リクエストの送信間隔が不十分
+    if (errorMsg.includes('ERR-5003')) {
+      this.logger.warn('Rate limit error detected. Consider increasing subscription interval.', {
+        error: errorMsg,
+      });
+    }
+  }
+
+  /**
+   * メッセージに channel プロパティがあるか判定
+   * @param message メッセージ
+   * @returns channel がある場合 true
+   */
+  private hasChannel(message: unknown): boolean {
+    return typeof message === 'object' && message !== null && 'channel' in message;
+  }
+
+  /**
+   * 受信メッセージのメトリクスを記録
+   * @param message メッセージ
+   */
+  private recordReceivedMetrics(message: unknown): void {
+    if (
+      !this.metricsCollector ||
+      typeof message !== 'object' ||
+      message === null ||
+      !('channel' in message) ||
+      !('symbol' in message)
+    ) {
+      return;
+    }
+
+    this.metricsCollector.incrementReceived(String(message.channel), String(message.symbol));
   }
 }

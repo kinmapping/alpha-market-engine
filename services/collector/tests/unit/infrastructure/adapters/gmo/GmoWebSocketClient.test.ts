@@ -174,7 +174,7 @@ describe('GmoWebSocketClient', () => {
 
       const subscribePromise = client.subscribe(mockConnectionInstance, symbol);
       // タイマーを進めてすべてのリクエストが送信されるまで待つ
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL * 2);
       await subscribePromise;
 
       expect(mockSend).toHaveBeenCalledTimes(3);
@@ -195,11 +195,11 @@ describe('GmoWebSocketClient', () => {
       expect(mockSend).toHaveBeenCalledTimes(1);
 
       // 1秒経過
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL);
       expect(mockSend).toHaveBeenCalledTimes(2);
 
       // さらに1秒経過
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL);
       expect(mockSend).toHaveBeenCalledTimes(3);
 
       await subscribePromise;
@@ -210,7 +210,7 @@ describe('GmoWebSocketClient', () => {
 
       const subscribePromise = client.subscribe(mockConnectionInstance, symbol);
       // タイマーを進めてすべてのリクエストが送信されるまで待つ
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL * 2);
       await subscribePromise;
 
       // すべてのリクエストが送信されている
@@ -225,7 +225,7 @@ describe('GmoWebSocketClient', () => {
 
       const subscribePromise = client.subscribe(mockConnectionInstance, symbol);
       // タイマーを進めてすべてのリクエストが送信されるまで待つ
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL * 2);
       await subscribePromise;
 
       expect(loggerMock.info).toHaveBeenCalledTimes(3);
