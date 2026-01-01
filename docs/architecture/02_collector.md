@@ -505,6 +505,178 @@ export class BackoffStrategy {
 
 ---
 
+## レート制限対策
+
+### GMO コイン API のレート制限
+
+GMO コインの Public WebSocket API には、リクエスト頻度に関する制限があります。詳細は [GMO コイン API ドキュメント](https://api.coin.z.com/docs/#outline) の「制限」セクションを参照してください。
+
+**主な制限事項**:
+- **Public WebSocket API**: 購読リクエストの送信頻度に制限があります
+- **エラーコード ERR-5003**: "Request too many." が返された場合、レート制限に達しています
+
+### 現在の実装での対策
+
+collector では、以下の対策を実装しています：
+
+#### 1. 接続確立後の待機時間
+
+```typescript
+// GmoAdapter.ts
+private readonly CONNECTION_DELAY = 500; // 接続確立後の待機時間（ミリ秒）
+
+async connect(): Promise<void> {
+  // WebSocket 接続を確立
+  this.connection = await this.webSocketClient.connect(this.wsUrl);
+
+  // 接続確立後、500ms 待機してから購読リクエストを送信
+  await new Promise((resolve) => setTimeout(resolve, this.CONNECTION_DELAY));
+  await this.webSocketClient.subscribe(this.connection, this.symbol);
+}
+```
+
+#### 2. 購読リクエスト間の間隔
+
+```typescript
+// GmoWebSocketClient.ts
+private readonly SUBSCRIPTION_INTERVAL = 1000; // 1秒
+
+async subscribe(connection: WebSocketConnection, symbol: string): Promise<void> {
+  const channels: Array<'ticker' | 'orderbooks' | 'trades'> = ['ticker', 'orderbooks', 'trades'];
+  
+  for (let i = 0; i < channels.length; i++) {
+    const channel = channels[i];
+    connection.send(JSON.stringify(command));
+    
+    // 最後のリクエスト以外は 1秒間隔で待機
+    if (i < channels.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, this.SUBSCRIPTION_INTERVAL));
+    }
+  }
+}
+```
+
+**現在のタイミング**:
+1. WebSocket 接続確立
+2. **500ms 待機** (`CONNECTION_DELAY`)
+3. ticker チャンネル購読
+4. **1秒待機** (`SUBSCRIPTION_INTERVAL`)
+5. orderbooks チャンネル購読
+6. **1秒待機** (`SUBSCRIPTION_INTERVAL`)
+7. trades チャンネル購読
+
+**合計時間**: 約 2.5 秒（接続確立後）
+
+### ERR-5003 エラーへの対策
+
+ログで `ERR-5003 Request too many.` エラーが発生した場合、以下の対策を検討してください：
+
+#### 対策案 1: 購読間隔の延長（推奨）
+
+`GmoWebSocketClient.SUBSCRIPTION_INTERVAL` を 1秒から 2秒に延長：
+
+```typescript
+// GmoWebSocketClient.ts
+private readonly SUBSCRIPTION_INTERVAL = 2000; // 2秒に延長
+```
+
+**効果**: 購読リクエスト間の間隔が長くなり、レート制限に達しにくくなります。
+
+#### 対策案 2: 接続待機時間の延長
+
+`GmoAdapter.CONNECTION_DELAY` を 500ms から 1秒に延長：
+
+```typescript
+// GmoAdapter.ts
+private readonly CONNECTION_DELAY = 1000; // 1秒に延長
+```
+
+**効果**: 接続確立直後の購読リクエスト送信を遅らせ、レート制限を回避します。
+
+#### 対策案 3: 環境変数による設定
+
+設定値を環境変数で制御可能にする：
+
+```typescript
+// GmoAdapter.ts
+private readonly CONNECTION_DELAY = Number.parseInt(
+  process.env.GMO_CONNECTION_DELAY ?? '500',
+  10
+);
+
+// GmoWebSocketClient.ts
+private readonly SUBSCRIPTION_INTERVAL = Number.parseInt(
+  process.env.GMO_SUBSCRIPTION_INTERVAL ?? '1000',
+  10
+);
+```
+
+**効果**: 環境に応じて柔軟に調整可能になります。
+
+#### 対策案 4: エラー発生時の自動調整
+
+ERR-5003 エラーが発生した場合、自動的に間隔を延長する：
+
+```typescript
+// GmoWebSocketClient.ts
+private subscriptionInterval = 1000; // 初期値
+
+async subscribe(connection: WebSocketConnection, symbol: string): Promise<void> {
+  // ... 購読処理 ...
+  
+  // ERR-5003 エラーが発生した場合、間隔を 1.5倍に延長
+  if (errorCode === 'ERR-5003') {
+    this.subscriptionInterval = Math.min(
+      this.subscriptionInterval * 1.5,
+      5000 // 最大 5秒
+    );
+  }
+}
+```
+
+**効果**: 動的にレート制限を回避します。
+
+### 推奨設定値
+
+**現在の設定**（ERR-5003 が発生する場合）:
+- `CONNECTION_DELAY`: 500ms
+- `SUBSCRIPTION_INTERVAL`: 1000ms
+
+**推奨設定**（ERR-5003 を回避）:
+- `CONNECTION_DELAY`: **1000ms**（1秒）
+- `SUBSCRIPTION_INTERVAL`: **2000ms**（2秒）
+
+**合計時間**: 約 5秒（接続確立後）
+
+### メトリクスによる監視
+
+ERR-5003 エラーの発生頻度をメトリクスで監視し、レート制限対策の効果を確認します：
+
+```typescript
+// WebSocketHandler.ts
+if (errorMsg.includes('ERR-5003')) {
+  this.logger.warn('Rate limit error detected. Consider increasing subscription interval.', {
+    error: errorMsg,
+  });
+
+  // メトリクス収集: API エラー
+  if (this.metricsCollector) {
+    this.metricsCollector.incrementError('api_error');
+  }
+}
+```
+
+**Prometheus メトリクス**:
+- `collector_errors_total{error_type="api_error"}`: API エラー数の推移を監視
+- ERR-5003 エラーが継続的に発生する場合は、設定値の見直しが必要です
+
+### 参考資料
+
+- [GMO コイン API ドキュメント](https://api.coin.z.com/docs/#outline)
+- [GMO コイン API エラーコード一覧](https://api.coin.z.com/docs/#エラーコード)
+
+---
+
 ## メッセージ正規化
 
 ### 正規化インターフェース
@@ -783,6 +955,103 @@ Docker環境では:
 現時点ではファイル出力の実装は不要と判断できますが、必要に応じて上記の実装を追加できます。
 
 ---
+## メトリクス集計設計
+
+メトリクス… システムの状態、性能、ビジネスの成果などを客観的に把握・評価するために数値化した指標
+
+### 計測対象メトリクス
+
+観測して指標を作っていく要素を必須、拡張として考えていきます。
+
+#### 必須メトリクス
+
+|メトリクス|説明|
+|---|---|
+|受信メッセージ数|WebSocket API から受信したメッセージ数（チャンネル別、シンボル別）|
+|配信メッセージ数|Redis Stream に配信したメッセージ数（ストリーム別、シンボル別）|
+|エラー数|パースエラー、配信エラー、API エラー（種類別）|
+|再接続回数|WebSocket 切断・再接続の回数|
+
+#### 拡張メトリクス
+
+|メトリクス|説明|
+|---|---|
+|レイテンシー|受信から配信までの時間（p50, p95, p99）|
+|メッセージサイズ|受信/配信メッセージの平均サイズ|
+|バッファサイズ|Redis 接続のバッファ状態|
+
+
+### 開発
+ローカル環境: Docker イメージに prometheus と grafana があるのでそれを利用
+実行環境: クラウドサービス(AWS の Prometheus、Grafana を利用、または CloudWatch を検討)
+
+
+#### prom-client
+
+Node.js 用の Prometheus クライアントライブラリ。
+collector サービス内でメトリクスを収集・公開する役割。
+
+1. メトリクスの収集（カウンター、ゲージ、ヒストグラムなど）
+2. メモリ内での保持
+3. HTTP エンドポイント（/metrics）での公開
+
+```mermaid
+flowchart TB
+
+subgraph collector
+%% direction LR
+pc@{ shape: circle, label: "prom-client"}
+server@{ shape: rect, label: "HTTP サーバー<br>（Node.js 標準） " }
+end
+
+subgraph prometheus
+db@{ shape: db, label: "時系列<br>データベース" }
+end
+
+subgraph grafana
+dashboard@{ shape: rect, label: "ダッシュボード<br>（可視化）" }
+query@{ shape: rect, label: "PromQL<br>クエリエンジン" }
+end
+
+pc ==>|メトリクスの収集をして<br>/metrics に公開| server
+prometheus e1@==>|15秒インターバル<br>で/metrics をリクエスト<br>指標値を取得（pull）| server
+query e2@==>|PromQL クエリで<br>時系列データを取得| db
+query ==>|グラフ・テーブルで<br>可視化| dashboard
+
+e1@{ animate: true }
+e2@{ animate: true }
+
+```
+- **prom-client**
+  - Counter, Gauge, Histogram など
+  - メモリ内でカウンターを保持
+
+- **HTTP サーバー（Node.js 標準）**
+  - GET /metrics → prom-client から
+  - メトリクスを取得して返す
+
+### Grafana（観測結果の表示）
+
+Grafana の役割は
+1. Prometheus から時系列データをクエリ（PromQL）
+2. ダッシュボードで可視化
+3. アラート設定（オプション）
+
+#### Grafana の構成要素
+- **PromQL クエリエンジン**
+  - Prometheus の時系列DBに PromQL でクエリ
+  - 例: rate(collector_messages_received_total[1m])
+- **ダッシュボード（可視化）**
+  - グラフ、テーブル、ゲージなどで表示
+  - リアルタイム更新
+
+npm install を実行して prom-client をインストール
+collector サービスを起動
+curl http://localhost:9090/metrics でメトリクスが取得できることを確認
+Prometheus がメトリクスを収集していることを確認
+すべての TODO が完了しました。
+
+---
 
 ## 参考資料
 
@@ -791,4 +1060,4 @@ Docker環境では:
 - [GMOコイン API Documentation](https://api.coin.z.com/docs/#t-spot_param_list_symbol) - GMO コインの WebSocket API
 - [システムアーキテクチャ](./01_architecture.md) - システム全体のアーキテクチャ
 - [レイヤードアーキテクチャを採用した際のWebSocket実装例](https://blog.p1ass.com/posts/websocket-with-layerd-architecture/#:~:text=%E6%98%8E%E7%A2%BA%E3%81%AB%20DDD%20%E3%82%84%20Clean%20Architecture%20%E3%81%A7%E3%81%82%E3%82%8B%E3%81%A8%E3%81%AF%E8%A8%80%E3%81%88%E3%81%AA%E3%81%84%E3%81%A7%E3%81%99%E3%81%8C%E3%80%81%E3%81%9D%E3%81%AE%E6%80%9D%E6%83%B3%E3%82%92%E5%8F%96%E3%82%8A%E5%85%A5%E3%82%8C%E3%81%A4%E3%81%A4%E7%8B%AC%E8%87%AA%E3%81%AB%E3%82%AB%E3%82%B9%E3%82%BF%E3%83%9E%E3%82%A4%E3%82%BA%E3%81%97%E3%81%A6%E3%81%84%E3%81%BE%E3%81%99%E3%80%82%5B%5E1%5D.%20%5B%5E1%5D%20%E3%81%93%E3%81%93%E3%81%A7%E3%81%AF%E3%81%93%E3%81%AE%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E3%81%AE%E8%89%AF%E3%81%97%E6%82%AA%E3%81%97%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6%E3%81%AF%E8%AA%9E%E3%82%8A%E3%81%BE%E3%81%9B%E3%82%93%E3%80%82%E8%A9%B1%E3%81%8C%E9%80%B8%E3%82%8C%E3%81%99%E3%81%8E%E3%82%8B%E3%81%AE%E3%81%A7%E3%80%82%20WebSocket%20%E3%81%AE%E6%A9%9F%E8%83%BD%E8%A6%81%E4%BB%B6)
-
+- [prom-client](https://github.com/siimon/prom-client)

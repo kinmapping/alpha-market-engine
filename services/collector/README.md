@@ -1,198 +1,393 @@
-# collector テスト
+# コード規約
 
-## 概要
+本プロジェクトの TypeScript/Node.js コード規約を定義します。
 
-collector の動作確認を自動化するテストスイートです。
+## 目次
 
+1. [命名規則](#命名規則)
+2. [ファイル構成](#ファイル構成)
+3. [型定義](#型定義)
+4. [インポート/エクスポート](#インポートエクスポート)
+5. [コメント](#コメント)
+6. [エラーハンドリング](#エラーハンドリング)
+7. [レイヤードアーキテクチャ](#レイヤードアーキテクチャ)
+8. [その他](#その他)
+
+---
+
+## 命名規則
+
+### 定数
+
+クラス内の定数（`readonly` フィールド）は **大文字スネークケース** を使用します。
+
+```typescript
+export class BackoffStrategy {
+  private readonly BASE_DELAY = 1000; // 1秒
+  private readonly MAX_DELAY = 30000; // 30秒
+}
+
+export class GmoWebSocketClient {
+  private readonly SUBSCRIPTION_INTERVAL = 1000; // 1秒
+}
+```
+
+### クラス名
+
+**PascalCase** を使用します。
+
+```typescript
+export class GmoAdapter implements MarketDataAdapter { }
+export class BackoffStrategy { }
+export class RedisPublisher implements EventPublisher { }
+```
+
+### インターフェース名
+
+**PascalCase** を使用します。インターフェース名は名詞または形容詞で始めます。
+
+```typescript
+export interface MarketDataAdapter { }
+export interface MessageHandler { }
+export interface EventPublisher { }
+```
+
+### 型エイリアス（Type Alias）
+
+**PascalCase** を使用します。
+
+```typescript
+export type MarketDataType = 'trade' | 'orderbook' | 'ticker';
+export type GmoRawMessage = { /* ... */ };
+```
+
+### 関数名・メソッド名
+
+**camelCase** を使用します。動詞で始めることを推奨します。
+
+```typescript
+async function bootstrap(): Promise<void> { }
+function requireEnv(key: string): string { }
+async connect(): Promise<void> { }
+getNextDelay(): number { }
+```
+
+### 変数名
+
+**camelCase** を使用します。
+
+```typescript
+const publisher = new RedisPublisher(REDIS_URL);
+const messageHandler = new DefaultMessageHandler(parser, publisher);
+const adapters = SYMBOLS.split(',');
+```
+
+### プライベートメンバー
+
+クラスのプライベートメンバーには `private` 修飾子を使用します。
+
+```typescript
+export class GmoAdapter {
+  private connection: WebSocketConnection | null = null;
+  private readonly reconnectManager: ReconnectManager;
+  private readonly CONNECTION_DELAY = 500;
+}
+```
+
+### ファイル名
+
+- クラスファイル: **PascalCase**（例: `GmoAdapter.ts`, `BackoffStrategy.ts`）
+- 型定義ファイル: **PascalCase**（例: `GmoRawMessage.ts`, `GmoCommand.ts`）
+- ユーティリティファイル: **camelCase**（例: `utils.ts`）
+
+## 型定義
+
+### 型の明示
+
+可能な限り型を明示します。TypeScript の `strict` モードを有効にしています。
+
+```typescript
+// 良い例
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
+
+// 避けるべき例（型推論に任せすぎない）
+function requireEnv(key) { // 型が不明確
+  // ...
+}
+```
+
+### 型エイリアス vs インターフェース
+
+- **型エイリアス（`type`）**: ユニオン型、交差型、プリミティブ型の組み合わせに使用
+- **インターフェース（`interface`）**: オブジェクトの形状を定義する場合に使用
+
+```typescript
+// 型エイリアス: ユニオン型
+export type MarketDataType = 'trade' | 'orderbook' | 'ticker';
+
+// インターフェース: オブジェクトの形状
+export interface NormalizedEvent {
+  type: MarketDataType;
+  exchange: string;
+  symbol: string;
+  ts: number;
+  data: unknown;
+}
+```
+
+### `readonly` の使用
+
+変更されないフィールドには `readonly` を付与します。
+
+```typescript
+export class GmoAdapter {
+  private readonly reconnectManager: ReconnectManager;
+  private readonly webSocketClient: GmoWebSocketClient;
+  private readonly CONNECTION_DELAY = 500;
+}
+```
+
+---
+
+## インポート/エクスポート
+
+### パスエイリアス
+
+プロジェクトルートからの絶対パスには `@/` エイリアスを使用します。
+
+```typescript
+// 良い例
+import { NormalizedEvent } from '@/domain/types';
+import { MarketDataAdapter } from '@/application/interfaces/MarketDataAdapter';
+import { MessageHandler } from '@/application/handlers/MessageHandler';
+
+// 避けるべき例（相対パスが深くなる場合）
+import { NormalizedEvent } from '../../../domain/types';
+```
+
+### 相対パス
+
+同じディレクトリ内または近いディレクトリのファイルには相対パスを使用します。
+
+```typescript
+// 同じディレクトリ内
+import { GmoWebSocketClient } from './GmoWebSocketClient';
+import { GmoMessageParser } from './GmoMessageParser';
+
+// 親ディレクトリ
+import { BackoffStrategy } from '../reconnect/BackoffStrategy';
+```
+
+### 拡張子
+
+- **パスエイリアス（`@/`）を使用する場合**: 拡張子を付けない
+- **相対パスを使用する場合**: `.ts` 拡張子を付ける（TypeScript 5.9+ の `allowImportingTsExtensions` 設定により）
+
+```typescript
+// パスエイリアス（拡張子なし）
+import { NormalizedEvent } from '@/domain/types';
+
+// 相対パス（.ts 拡張子あり）
+import { GmoWebSocketClient } from './GmoWebSocketClient.ts';
+```
+
+### エクスポート
+
+- クラス、インターフェース、型は `export` を使用
+- デフォルトエクスポートは使用しない（名前付きエクスポートを推奨）
+
+```typescript
+// 良い例
+export class GmoAdapter { }
+export interface MarketDataAdapter { }
+export type MarketDataType = 'trade' | 'orderbook' | 'ticker';
+
+// 避けるべき例
+export default class GmoAdapter { }
+```
+
+---
+
+## コメント
+
+### JSDoc コメント
+
+公開メソッド、クラス、インターフェースには JSDoc コメントを記述します。
+
+```typescript
+/**
+ * インフラ層: MarketDataAdapter 実装
+ *
+ * 責務: GMO コインの WebSocket API を処理するアダプタ。
+ * WebSocket 接続、購読、メッセージ受信、正規化、Redis への配信を統合する。
+ */
+export class GmoAdapter implements MarketDataAdapter {
+  /**
+   * GmoAdapter を初期化する。
+   * @param symbol 取引ペア（例: 'BTC_JPY'）
+   * @param wsUrl GMO コインの WebSocket エンドポイント URL
+   * @param messageHandler メッセージ処理のハンドラ（正規化→配信を担当）
+   */
+  constructor(
+    private readonly symbol: string,
+    private readonly wsUrl: string,
+    messageHandler: MessageHandler
+  ) { }
+
+  /**
+   * 次の再接続までの遅延時間（ミリ秒）を取得する。
+   * @returns 遅延時間（ミリ秒）
+   */
+  getNextDelay(): number {
+    // ...
+  }
+}
+```
+
+### インラインコメント
+
+複雑なロジックや意図が明確でない箇所にはインラインコメントを記述します。
+
+```typescript
+// レート制限対策: 各購読リクエストの間に 1秒の間隔を設ける
+// GMO API のレート制限が厳しいため、間隔を長めに設定
+for (let i = 0; i < channels.length; i++) {
+  // ...
+  if (i < channels.length - 1) {
+    await new Promise((resolve) => setTimeout(resolve, this.SUBSCRIPTION_INTERVAL));
+  }
+}
+```
+
+---
+
+## エラーハンドリング
+
+### エラーの明示的な処理
+
+エラーは可能な限り明示的に処理します。
+
+```typescript
+// 良い例
+try {
+  const message = JSON.parse(text) as GmoRawMessage;
+  return message;
+} catch (error) {
+  console.error('[GmoWebSocketClient] failed to parse message:', error);
+  return null;
+}
+
+// エラーメッセージの処理
+if ('error' in rawMessage && typeof rawMessage.error === 'string') {
+  console.error(`[GmoAdapter] API error: ${rawMessage.error}`);
+  return;
+}
+```
+
+### エラーログ
+
+エラーログにはコンテキスト情報（クラス名、メソッド名など）を含めます。
+
+```typescript
+console.error('[GmoWebSocketClient] failed to parse message:', error);
+console.error(`[GmoAdapter] API error: ${rawMessage.error}`);
+console.warn(`[GmoAdapter] socket closed for ${this.symbol}`);
+```
+---
+
+## その他
+
+### 非同期処理
+
+非同期処理には `async/await` を使用します。`Promise` チェーンは避けます。
+
+```typescript
+// 良い例
+async function bootstrap(): Promise<void> {
+  const publisher = new RedisPublisher(REDIS_URL);
+  await Promise.all(adapters.map((adapter) => adapter.start()));
+}
+
+// 避けるべき例
+function bootstrap(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Promise チェーン
+  });
+}
+```
+
+### 環境変数
+
+環境変数は必須であることを前提とし、デフォルト値は設定しません。
+
+```typescript
+// 良い例
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
+
+const EXCHANGE_NAME = requireEnv('EXCHANGE_NAME');
+const WS_PUBLIC_URL = requireEnv('WS_PUBLIC_URL');
+```
+
+### コードフォーマット
+
+- インデント: 2スペース
+- セミコロン: 使用する
+- クォート: シングルクォート（`'`）を使用
+- 行の長さ: 100文字を目安（可読性を優先）
+
+### TypeScript 設定
+
+`tsconfig.json` の `strict` モードを有効にしています。
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ES2022"
+  }
+}
+```
+
+---
 ## テストの種類
 
 ### 単体テスト (`tests/unit/`)
 
 個別のコンポーネントを独立してテストします。モックを使用して外部依存を排除します。
 
-**テストファイルは `src` のディレクトリ構造に合わせて配置されています。**
-
-#### Infrastructure層
-
-- **reconnect/BackoffStrategy.test.ts**: 指数バックオフ戦略のテスト
-  - 指数関数的な遅延計算
-  - MAX_DELAY の上限チェック
-  - reset() の動作確認
-
-- **reconnect/ReconnectManager.test.ts**: 再接続管理のテスト
-  - start() の動作確認
-  - scheduleReconnect() の動作確認
-  - stop() の動作確認
-  - バックオフ戦略の適用
-
-- **redis/RedisPublisher.test.ts**: Redis Stream への配信テスト
-  - publish() の動作確認（ticker/orderbook/trade）
-  - データの JSON シリアライズ確認
-  - Redis接続エラーのハンドリング
-  - Stream名の取得ロジック
-  - close() の動作確認
-
-- **adapters/gmo/GmoMessageParser.test.ts**: GMO メッセージパーサーのテスト
-  - 正常系: ticker/orderbook/trade メッセージの正規化
-  - エッジケース: 不正なタイムスタンプ、不正なデータ型、部分的なデータ欠損
-  - エラーメッセージの処理
-  - 未知のチャンネル、パースエラーの処理
-
-- **adapters/gmo/GmoWebSocketClient.test.ts**: GMO WebSocket クライアントのテスト
-  - WebSocket接続の確立（成功/失敗）
-  - 購読リクエストの送信（レート制限対策含む）
-  - メッセージのパース（string/ArrayBuffer/Blob対応）
-  - 接続の切断
-
-- **adapters/gmo/GmoAdapter.test.ts**: GMO アダプタのテスト
-  - start(), connect(), disconnect() の動作確認
-  - handleMessage() のエラーハンドリング
-  - 再接続ロジックとの連携
-
-- **websocket/WebSocketConnection.test.ts**: WebSocket接続ラッパーのテスト
-  - イベントリスナーの管理
-  - コールバックの登録と実行
-  - WebSocket メソッドの呼び出し
-
-#### Application層
-
-- **application/MessageHandler.test.ts**: メッセージハンドラーのテスト
-  - 正常系: パーサー→パブリッシャーのフロー
-  - エッジケース: パーサーが null を返す場合
-  - エラーハンドリング: パブリッシャーがエラーを投げる場合
-
-### 統合テスト (`tests/integration/`)
-
-実際の Redis に接続して、データ配信が正常に動作することを確認します。
-
-- **redis-stream.test.ts**: Redis Stream へのデータ配信確認
-  - Stream の存在確認（md:ticker, md:orderbook, md:trade）
-  - データ配信確認
-  - データ構造確認（正規化された形式）
-  - Stream 長さの確認
-
-- **message-normalization.test.ts**: メッセージ正規化の確認
-  - GMO API メッセージの正規化
-  - エラーハンドリング
-  - データ型の確認
 
 ## 実行方法
 
 ### 前提条件
-
-1. Redis が起動している必要があります
-   ```bash
-   # Docker Compose で起動
-   docker-compose -f docker-compose.local.yml up -d redis
-
-   # またはローカルの Redis が起動している
-   redis-server
-   ```
-
-2. 環境変数が設定されている必要があります（オプション）
-   ```bash
-   export REDIS_URL=redis://localhost:6379/0
-   ```
-
-### すべてのテストを実行
+統合テストのために Redis が起動している必要があります
 
 ```bash
+# すべてのテストを実行
 npm test
-```
 
-### 単体テストのみ実行
-
-```bash
+# 単体テストのみ実行
 npm run test:unit
-```
 
-### 統合テストのみ実行
 
-```bash
+# 統合テストのみ実行
 npm run test:integration
-```
 
-### ウォッチモード（開発時）
-
-```bash
+# ウォッチモード（開発時）
 npm run test:watch
 ```
-
-## テストの確認項目
-
-### レベル1: 基本動作確認（統合テスト）
-
-以下の項目が自動的に確認されます：
-
-- ✅ `md:ticker`, `md:orderbook`, `md:trade` の3つのStreamが存在する
-- ✅ 各Streamにデータが流れている
-- ✅ 正規化されたデータ構造が正しい（`exchange`, `symbol`, `ts`, `data` フィールドが存在）
-- ✅ タイムスタンプが適切に設定されている
-- ✅ メッセージ数が増加している
-
-### メッセージ正規化の確認（統合テスト）
-
-- ✅ GMO API の ticker/orderbook/trade メッセージが正規化される
-- ✅ エラーメッセージが適切に処理される
-- ✅ 不正な形式のメッセージが適切に処理される
-
-### ユニットテスト (`tests/unit/`)
-
-#### Infrastructure層
-
-- ✅ **reconnect/BackoffStrategy.test.ts** (11 tests)
-  - 指数バックオフの計算ロジック
-  - MAX_DELAY の上限チェック
-  - reset() の動作確認
-
-- ✅ **reconnect/ReconnectManager.test.ts** (16 tests)
-  - start() の動作確認
-  - scheduleReconnect() の動作確認
-  - stop() の動作確認
-  - バックオフ戦略の適用
-  - エラーハンドリング
-  - 統合的な動作確認
-
-- ✅ **redis/RedisPublisher.test.ts** (17 tests)
-  - publish() の動作確認（ticker/orderbook/trade）
-  - データの JSON シリアライズ確認
-  - Redis接続エラーのハンドリング
-  - Stream名の取得ロジック
-  - close() の動作確認
-  - 複数のイベント配信
-  - エッジケース: 特殊なデータ形式
-
-- ✅ **adapters/gmo/GmoMessageParser.test.ts** (21 tests)
-  - 正常系: ticker/orderbook/trade メッセージの正規化
-  - エッジケース: 不正なタイムスタンプ、不正なデータ型、部分的なデータ欠損
-  - エラーメッセージの処理
-  - 未知のチャンネル、パースエラーの処理
-  - 境界値テスト（大きな数値、負の数値、ゼロ値）
-
-- ✅ **adapters/gmo/GmoWebSocketClient.test.ts** (14 tests)
-  - connect() メソッド: WebSocket接続の成功/失敗シナリオ
-  - subscribe() メソッド: 3つのチャンネルへの購読、レート制限対策
-  - parseMessage() メソッド: string/ArrayBuffer/Blob 形式のパース、エラーハンドリング
-  - disconnect() メソッド: 接続の切断処理
-
-- ✅ **adapters/gmo/GmoAdapter.test.ts** (14 tests)
-  - コンストラクタ、start(), connect(), disconnect() の動作確認
-  - handleMessage() のエラーハンドリング（ERR-5003、channel がないメッセージなど）
-  - 再接続ロジックとの連携
-
-- ✅ **websocket/WebSocketConnection.test.ts** (15 tests)
-  - StandardWebSocketConnection のイベントリスナー管理
-  - onOpen/onMessage/onClose/onError のコールバック登録と実行
-  - send/close/removeAllListeners/terminate メソッドの動作確認
-  - 複数のコールバックの登録と実行順序
-
-#### Application層
-
-- ✅ **MessageHandler.test.ts** (9 tests)
-  - 正常フロー（parser → publisher）
-  - エッジケース（parser が null を返す場合）
-  - エラーハンドリング（publisher がエラーを投げる場合）
-  - 複数メッセージの処理
 
 ## CI/CD での実行
 
@@ -229,7 +424,9 @@ Error: connect ECONNREFUSED 127.0.0.1:6379
 - `vitest.config.ts` の `testTimeout` を増やす（デフォルト: 30秒）
 - Redis の接続を確認
 
-## リンター設定
+---
+## リンター
+TypeScript には Biome を使用。
 
 ### Biome と ESLint の併用
 
@@ -247,11 +444,17 @@ npm run lint
 # Biome のみ実行
 npm run lint:biome
 
+# フォーマット実行
+npm run format
+
 # ESLint のみ実行
 npm run lint:eslint
 
 # 自動修正（Biome と ESLint の両方）
 npm run lint:fix
+
+# 型チェック（TypeScript）
+npm run type-check
 ```
 
 ### ESLint の複雑度ルール
@@ -367,10 +570,14 @@ npm install --save-dev jiti
 
 ESLint v9 は `jiti` を使用して TypeScript 設定ファイル（`eslint.config.ts`）を読み込みます。
 
+
+---
 ## 参考資料
 
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
+- [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html)
+- [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
 - [Vitest ドキュメント](https://vitest.dev/)
 - [Redis Streams ドキュメント](https://redis.io/docs/data-types/streams/)
 - [collector 設計](../docs/architecture/02_collector.md)
 - [Biome ドキュメント](https://biomejs.dev/)
-
