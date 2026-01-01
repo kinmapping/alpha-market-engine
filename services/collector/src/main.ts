@@ -95,7 +95,7 @@ async function bootstrap(): Promise<void> {
   await Promise.all(handlers.map((handler) => handler.start()));
 
   // メトリクスサーバーを起動
-  const metricsPort = Number.parseInt(process.env.METRICS_PORT ?? '9090', 10);
+  const metricsPort = Number.parseInt(process.env.COLLECTOR_METRICS_PORT as string, 10);
   const metricsServer = new MetricsServer(metricsCollector, metricsPort, rootLogger);
   metricsServer.start();
 
