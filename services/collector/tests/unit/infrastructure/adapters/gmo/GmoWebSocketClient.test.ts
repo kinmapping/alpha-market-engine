@@ -1,63 +1,27 @@
+import { LoggerMock } from '@test/unit/helpers/mocks/LoggerMock';
+import {
+  createMockWebSocketConnection,
+  mockClose,
+  mockOnError,
+  mockOnOpen,
+  mockRemoveAllListeners,
+  mockSend,
+  resetStandardWebSocketConnectionMocks,
+} from '@test/unit/helpers/mocks/StandardWebSocketConnectionMock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmoWebSocketClient } from '@/infra/adapters/gmo/GmoWebSocketClient';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
-import { LoggerMock } from '../../../helpers/LoggerMock';
 
 // StandardWebSocketConnection をモック
-const mockOnOpen = vi.fn();
-const mockOnError = vi.fn();
-const mockOnMessage = vi.fn();
-const mockOnClose = vi.fn();
-const mockSend = vi.fn();
-const mockClose = vi.fn();
-const mockRemoveAllListeners = vi.fn();
-const mockTerminate = vi.fn();
-
-vi.mock('@/infra/websocket/StandardWebSocketConnection', () => {
-  class MockStandardWebSocketConnection {
-    private openCallbacks: Array<() => void> = [];
-    private errorCallbacks: Array<(error: Event) => void> = [];
-
-    onOpen(callback: () => void): void {
-      this.openCallbacks.push(callback);
-      mockOnOpen(callback);
-    }
-
-    onError(callback: (error: Event) => void): void {
-      this.errorCallbacks.push(callback);
-      mockOnError(callback);
-    }
-
-    onMessage(callback: (data: string | ArrayBuffer | Blob) => void): void {
-      mockOnMessage(callback);
-    }
-
-    onClose(callback: () => void): void {
-      mockOnClose(callback);
-    }
-
-    send(data: string): void {
-      mockSend(data);
-    }
-
-    close(): void {
-      mockClose();
-    }
-
-    removeAllListeners(): void {
-      this.openCallbacks = [];
-      this.errorCallbacks = [];
-      mockRemoveAllListeners();
-    }
-
-    terminate(): void {
-      mockTerminate();
-    }
-  }
+// vi.mock() は hoisting されるため、動的 import を使用してモッククラスを取得する
+vi.mock('@/infra/websocket/StandardWebSocketConnection', async () => {
+  const { createMockStandardWebSocketConnectionClass } = await import(
+    '@test/unit/helpers/mocks/StandardWebSocketConnectionMock'
+  );
 
   return {
-    StandardWebSocketConnection: MockStandardWebSocketConnection,
+    StandardWebSocketConnection: createMockStandardWebSocketConnectionClass(),
   };
 });
 
@@ -103,26 +67,10 @@ describe('GmoWebSocketClient', () => {
     global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
 
     // StandardWebSocketConnection のインスタンスをモック
-    mockConnectionInstance = {
-      onOpen: mockOnOpen,
-      onError: mockOnError,
-      onMessage: mockOnMessage,
-      onClose: mockOnClose,
-      send: mockSend,
-      close: mockClose,
-      removeAllListeners: mockRemoveAllListeners,
-      terminate: mockTerminate,
-    } as unknown as WebSocketConnection;
+    mockConnectionInstance = createMockWebSocketConnection();
 
     // モックをリセット
-    mockOnOpen.mockClear();
-    mockOnError.mockClear();
-    mockOnMessage.mockClear();
-    mockOnClose.mockClear();
-    mockSend.mockClear();
-    mockClose.mockClear();
-    mockRemoveAllListeners.mockClear();
-    mockTerminate.mockClear();
+    resetStandardWebSocketConnectionMocks();
 
     client = new GmoWebSocketClient(loggerMock);
   });
@@ -174,7 +122,7 @@ describe('GmoWebSocketClient', () => {
 
       const subscribePromise = client.subscribe(mockConnectionInstance, symbol);
       // タイマーを進めてすべてのリクエストが送信されるまで待つ
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL * 2);
       await subscribePromise;
 
       expect(mockSend).toHaveBeenCalledTimes(3);
@@ -195,11 +143,11 @@ describe('GmoWebSocketClient', () => {
       expect(mockSend).toHaveBeenCalledTimes(1);
 
       // 1秒経過
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL);
       expect(mockSend).toHaveBeenCalledTimes(2);
 
       // さらに1秒経過
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL);
       expect(mockSend).toHaveBeenCalledTimes(3);
 
       await subscribePromise;
@@ -210,7 +158,7 @@ describe('GmoWebSocketClient', () => {
 
       const subscribePromise = client.subscribe(mockConnectionInstance, symbol);
       // タイマーを進めてすべてのリクエストが送信されるまで待つ
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL * 2);
       await subscribePromise;
 
       // すべてのリクエストが送信されている
@@ -225,7 +173,7 @@ describe('GmoWebSocketClient', () => {
 
       const subscribePromise = client.subscribe(mockConnectionInstance, symbol);
       // タイマーを進めてすべてのリクエストが送信されるまで待つ
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(client.SUBSCRIPTION_INTERVAL * 2);
       await subscribePromise;
 
       expect(loggerMock.info).toHaveBeenCalledTimes(3);

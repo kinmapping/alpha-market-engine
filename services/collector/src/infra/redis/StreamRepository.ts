@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import type { Logger } from '@/application/interfaces/Logger';
+import type { MetricsCollector } from '@/application/interfaces/MetricsCollector';
 import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
 import type { StreamPublisher } from '@/domain/repositories/StreamPublisher';
 import { LoggerFactory } from '@/infra/logger/LoggerFactory';
@@ -16,8 +17,13 @@ export class StreamRepository implements StreamPublisher {
   /**
    * @param redisUrl Redis 接続 URL
    * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）
+   * @param metricsCollector メトリクスコレクター（オプショナル）
    */
-  constructor(redisUrl: string, logger?: Logger) {
+  constructor(
+    redisUrl: string,
+    logger?: Logger,
+    private readonly metricsCollector?: MetricsCollector
+  ) {
     this.redis = new Redis(redisUrl);
     this.logger = logger ?? LoggerFactory.create();
   }
@@ -27,19 +33,33 @@ export class StreamRepository implements StreamPublisher {
    * @param event 正規化されたイベント
    */
   async publish(event: NormalizedEvent): Promise<void> {
-    // イベントタイプに応じて Stream 名を取得
-    const stream = this.getStreamName(event.type);
-    const payload = {
-      exchange: event.exchange,
-      symbol: event.symbol,
-      ts: event.ts.toString(),
-      data: JSON.stringify(event.data),
-    };
+    try {
+      // イベントタイプに応じて Stream 名を取得
+      const stream = this.getStreamName(event.type);
+      const payload = {
+        exchange: event.exchange,
+        symbol: event.symbol,
+        ts: event.ts.toString(),
+        data: JSON.stringify(event.data),
+      };
 
-    // XADD コマンドでメッセージを追加
-    await this.redis.xadd(stream, '*', ...Object.entries(payload).flat());
-    // DEBUG:デバッグ確認(メトリクス集計処理に委譲する)
-    // this.logger.debug('published to stream', { stream, type: event.type, symbol: event.symbol });
+      // XADD コマンドでメッセージを追加
+      await this.redis.xadd(stream, '*', ...Object.entries(payload).flat());
+
+      // DEBUG:デバッグ確認(メモリ圧迫するため、開発確認時のみ有効化)
+      // this.logger.debug('published to stream', { stream, type: event.type, symbol: event.symbol });
+
+      // メトリクス収集: 配信メッセージ数
+      if (this.metricsCollector) {
+        this.metricsCollector.incrementPublished(stream, event.symbol);
+      }
+    } catch (error) {
+      // メトリクス収集: 配信エラー
+      if (this.metricsCollector) {
+        this.metricsCollector.incrementError('publish_error');
+      }
+      throw error;
+    }
   }
 
   /**

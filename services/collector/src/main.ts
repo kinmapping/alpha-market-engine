@@ -4,6 +4,8 @@ import { PublishStreamUsecase } from '@/application/usecases/PublishStreamUsecas
 import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
 import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
 import { LoggerFactory } from '@/infra/logger/LoggerFactory';
+import { MetricsServer } from '@/infra/metrics/MetricsServer';
+import { PrometheusMetricsCollector } from '@/infra/metrics/PrometheusMetricsCollector';
 import { StreamRepository } from '@/infra/redis/StreamRepository';
 import { WebSocketHandler } from '@/presentation/websocket/WebSocketHandler';
 
@@ -46,12 +48,15 @@ async function bootstrap(): Promise<void> {
   // ロガーを初期化
   const rootLogger = LoggerFactory.create();
 
-  // インフラ層: Stream Repository を生成（ロガーを注入）
-  const publisher = new StreamRepository(REDIS_URL, rootLogger);
+  // メトリクスコレクターを生成
+  const metricsCollector = new PrometheusMetricsCollector();
+
+  // インフラ層: Stream Repository を生成（ロガーとメトリクスコレクターを注入）
+  const publisher = new StreamRepository(REDIS_URL, rootLogger, metricsCollector);
 
   // アプリケーション層: ストリーム配信ユースケースを生成（正規化→配信のフローを組み立てる）
   const parser = new GmoMessageParser(rootLogger);
-  const usecase = new PublishStreamUsecase(parser, publisher);
+  const usecase = new PublishStreamUsecase(parser, publisher, metricsCollector);
 
   // インフラ層: SYMBOLS (カンマ区切り) から複数ペア対応のハンドラを生成
   const symbols = SYMBOLS.split(',')
@@ -66,8 +71,8 @@ async function bootstrap(): Promise<void> {
     // 1. GmoAdapter を先に作成（子ロガーを注入）
     const adapter = new GmoAdapter(symbol, WS_PUBLIC_URL, { logger: adapterLogger });
 
-    // 2. WebSocketHandler を作成（子ロガーを注入）
-    const handler = new WebSocketHandler(adapter, usecase, handlerLogger);
+    // 2. WebSocketHandler を作成（子ロガーとメトリクスコレクターを注入）
+    const handler = new WebSocketHandler(adapter, usecase, handlerLogger, metricsCollector);
 
     // 3. コールバックを設定（handler が作成済みなので安全に参照できる）
     adapter.setOnMessage(async (data) => {
@@ -89,8 +94,15 @@ async function bootstrap(): Promise<void> {
   // すべてのハンドラを並列で起動し、WebSocket 接続を張る。
   await Promise.all(handlers.map((handler) => handler.start()));
 
+  // メトリクスサーバーを起動
+  const metricsPort = Number.parseInt(process.env.COLLECTOR_METRICS_PORT as string, 10);
+  const metricsServer = new MetricsServer(metricsCollector, metricsPort, rootLogger);
+  metricsServer.start();
+
   const shutdown = async () => {
     rootLogger.info('Shutting down collector...');
+    // メトリクスサーバーを停止
+    metricsServer.stop();
     // SIGINT/SIGTERM で全ハンドラを切断し Redis クライアントも閉じる。
     for (const handler of handlers) {
       handler.disconnect();

@@ -1,7 +1,7 @@
+import { LoggerMock } from '@test/unit/helpers/mocks/LoggerMock';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { GmoMessageParser } from '@/infra/adapters/gmo/GmoMessageParser';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
-import { LoggerMock } from '../../../helpers/LoggerMock';
 
 /**
  * 単体テスト: GmoMessageParser

@@ -15,7 +15,7 @@ import type { GmoRawMessage } from './types/GmoRawMessage';
 export class GmoWebSocketClient {
   private connection: WebSocketConnection | null = null;
   private readonly logger: Logger;
-  private readonly SUBSCRIPTION_INTERVAL = 1000; // 1秒
+  public readonly SUBSCRIPTION_INTERVAL = 2000; // 2秒
 
   /**
    * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）

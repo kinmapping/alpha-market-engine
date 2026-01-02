@@ -1,7 +1,7 @@
+import { LoggerMock } from '@test/unit/helpers/mocks/LoggerMock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NormalizedEvent } from '@/domain/models/NormalizedEvent';
 import { StreamRepository } from '@/infra/redis/StreamRepository';
-import { LoggerMock } from '../../helpers/LoggerMock';
 
 // ioredis をモック
 const mockXadd = vi.fn().mockResolvedValue('1234567890-0');
@@ -21,8 +21,8 @@ vi.mock('ioredis', () => {
 /**
  * 単体テスト: RedisPublisher
  *
- * 優先度3: Infrastructure層の外部依存あり（Redis接続エラー時のハンドリング）
- * - 正常な配信
+ * Infrastructure層の外部依存あり（Redis接続エラー時のハンドリング）
+ * - publish() の正常な配信
  * - Redis接続エラー
  * - Stream名の取得ロジック
  * - close() の動作

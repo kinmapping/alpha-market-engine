@@ -23,7 +23,7 @@ export class GmoAdapter implements MarketDataAdapter {
   private connection: WebSocketConnection | null = null;
   private readonly webSocketClient: GmoWebSocketClient;
   private readonly logger: Logger;
-  private readonly CONNECTION_DELAY = 500; // 接続確立後の待機時間（ミリ秒）
+  public readonly CONNECTION_DELAY = 1000; // 接続確立後の待機時間（ミリ秒）
 
   private onMessageCallback?: (data: string | ArrayBuffer | Blob) => Promise<void>;
   private onCloseCallback?: () => void;

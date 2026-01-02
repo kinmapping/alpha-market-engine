@@ -1,4 +1,5 @@
 import type { Logger } from '@/application/interfaces/Logger';
+import type { MetricsCollector } from '@/application/interfaces/MetricsCollector';
 import { LoggerFactory } from '@/infra/logger/LoggerFactory';
 import { BackoffStrategy } from '@/infra/reconnect/BackoffStrategy';
 
@@ -16,10 +17,12 @@ export class ReconnectManager {
   /**
    * @param connectFn 再接続時に実行する接続関数
    * @param logger ロガー（オプショナル、未指定の場合は LoggerFactory から取得）
+   * @param metricsCollector メトリクスコレクター（オプショナル）
    */
   constructor(
     private readonly connectFn: () => Promise<void>,
-    logger?: Logger
+    logger?: Logger,
+    private readonly metricsCollector?: MetricsCollector
   ) {
     this.logger = logger ?? LoggerFactory.create();
   }
@@ -70,6 +73,12 @@ export class ReconnectManager {
       this.backoff.reset();
     } catch (error) {
       this.logger.error('Reconnect attempt failed', { err: error });
+
+      // メトリクス収集: 再接続回数
+      if (this.metricsCollector) {
+        this.metricsCollector.incrementReconnect();
+      }
+
       this.scheduleReconnect();
     }
   }

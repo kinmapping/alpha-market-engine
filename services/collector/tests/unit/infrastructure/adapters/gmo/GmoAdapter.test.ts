@@ -1,8 +1,8 @@
+import { LoggerMock } from '@test/unit/helpers/mocks/LoggerMock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmoAdapter } from '@/infra/adapters/gmo/GmoAdapter';
 import type { GmoRawMessage } from '@/infra/adapters/gmo/types/GmoRawMessage';
 import type { WebSocketConnection } from '@/infra/websocket/interfaces/WebSocketConnection';
-import { LoggerMock } from '../../../helpers/LoggerMock';
 
 // GmoWebSocketClient をモック
 const mockConnect = vi.fn();
@@ -104,13 +104,13 @@ describe('GmoAdapter', () => {
     it('既存接続がある場合、クリーンアップしてから新規接続を確立する', async () => {
       // 最初の接続
       const connectPromise1 = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise1;
       expect(mockConnect).toHaveBeenCalledTimes(1);
 
       // 2回目の接続（既存接続のクリーンアップ）
       const connectPromise2 = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise2;
 
       expect(mockConnection.removeAllListeners).toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe('GmoAdapter', () => {
 
     it('WebSocket接続を確立し、イベントハンドラを設定する', async () => {
       const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise;
 
       expect(mockConnect).toHaveBeenCalledWith(wsUrl);
@@ -136,7 +136,7 @@ describe('GmoAdapter', () => {
       expect(mockSubscribe).not.toHaveBeenCalled();
 
       // 500ms 経過
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
 
       await connectPromise;
 
@@ -146,7 +146,7 @@ describe('GmoAdapter', () => {
 
     it('接続が閉じられた場合、再接続をスケジュールする', async () => {
       const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise;
 
       // onClose コールバックを取得して実行
@@ -161,7 +161,7 @@ describe('GmoAdapter', () => {
 
     it('エラーが発生した場合、ログに記録する', async () => {
       const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise;
 
       // onError コールバックを取得して実行
@@ -181,7 +181,7 @@ describe('GmoAdapter', () => {
   describe('disconnect()', () => {
     it('接続が存在する場合、接続を切断する', async () => {
       const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise;
 
       adapter.disconnect();
@@ -199,7 +199,7 @@ describe('GmoAdapter', () => {
   describe('メッセージ処理', () => {
     it('正常なメッセージを処理する', async () => {
       const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise;
 
       const messageData = '{"channel":"ticker","symbol":"BTC_JPY"}';
@@ -217,7 +217,7 @@ describe('GmoAdapter', () => {
 
     it('メッセージを受信した場合、onMessage コールバックを呼び出す', async () => {
       const connectPromise = adapter.connect();
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(adapter.CONNECTION_DELAY);
       await connectPromise;
 
       const messageData = 'invalid message';

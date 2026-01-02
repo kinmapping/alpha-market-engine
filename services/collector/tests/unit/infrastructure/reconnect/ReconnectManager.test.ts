@@ -1,15 +1,17 @@
+import { LoggerMock } from '@test/unit/helpers/mocks/LoggerMock';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReconnectManager } from '@/infra/reconnect/ReconnectManager';
-import { LoggerMock } from '../../helpers/LoggerMock';
 
 /**
  * 単体テスト: ReconnectManager
  *
- * 優先度3: Infrastructure層の外部依存あり（再接続ロジックの詳細テスト）
+ * Infrastructure層の外部依存あり（再接続ロジックの詳細テスト）
  * - 接続成功時の動作
  * - 接続失敗時の再接続スケジューリング
  * - stop() の動作
  * - バックオフ戦略の適用
+ * - エラーハンドリング
+ * - 統合的な動作確認
  */
 describe('ReconnectManager', () => {
   let mockConnectFn: () => Promise<void>;
