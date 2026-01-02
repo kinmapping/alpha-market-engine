@@ -215,6 +215,21 @@ namespace `application/interfaces` {
         <<interface>>
         +parse(rawMessage: unknown): NormalizedEvent | null
     }
+
+    class MetricsCollector {
+        <<interface>>
+        +incrementReceived(channel: string, symbol: string): void
+        +incrementPublished(stream: string, symbol: string): void
+        +incrementError(errorType: string): void
+        +incrementReconnect(): void
+        +getMetrics(): Promise<string>
+        +getRegistry(): MetricsRegistry
+    }
+
+    class MetricsRegistry {
+        <<interface>>
+        +contentType: string
+    }
 }
 
 namespace `application/usecase` {
@@ -265,6 +280,23 @@ namespace `infra/redis` {
     }
 }
 
+namespace `infra/metrics` {
+    class PrometheusMetricsCollector {
+        -register: Registry
+        -receivedCounter: Counter
+        -publishedCounter: Counter
+        -errorCounter: Counter
+        -reconnectGauge: Gauge
+        +constructor()
+        +incrementReceived(channel: string, symbol: string): void
+        +incrementPublished(stream: string, symbol: string): void
+        +incrementError(errorType: string): void
+        +incrementReconnect(): void
+        +getMetrics(): Promise<string>
+        +getRegistry(): Registry
+    }
+}
+
 namespace `domain/models` {
     class NormalizedEvent {
         <<interface>>
@@ -287,6 +319,7 @@ WebSocketHandler --> MarketDataAdapter: DI(依存)
 WebSocketHandler --> PublishStreamUsecase: DI(依存)
 WebSocketHandler --> ReconnectManager: creates(生成)
 WebSocketHandler ..> GmoAdapter: uses(使用・実装)
+WebSocketHandler ..> MetricsCollector: DI(依存)
 
 GmoAdapter ..|> MarketDataAdapter: implements(実装)
 GmoAdapter ..> GmoWebSocketClient: DI(依存)
@@ -298,13 +331,20 @@ GmoMessageParser --> NormalizedEvent: returns(返却)
 
 StandardWebSocketConnection ..|> WebSocketConnection: implements(実装)
 ReconnectManager --> BackoffStrategy: uses(使用)
+ReconnectManager ..> MetricsCollector: DI(依存)
 PublishStreamUsecase --> MessageParser: DI(依存)
 PublishStreamUsecase --> StreamPublisher: DI(依存)
+PublishStreamUsecase ..> MetricsCollector: DI(依存)
 StreamRepository ..|> StreamPublisher: implements(実装)
 StreamRepository --> NormalizedEvent: uses(使用)
+StreamRepository ..> MetricsCollector: DI(依存)
 StreamPublisher --> NormalizedEvent: uses(使用)
 MessageParser --> NormalizedEvent: uses(型依存)
 NormalizedEvent --> MarketDataType: uses(使用)
+
+PrometheusMetricsCollector ..|> MetricsCollector: implements(実装)
+PrometheusMetricsCollector --> MetricsRegistry: returns(返却)
+MetricsCollector --> MetricsRegistry: uses(使用)
 ```
 
 
@@ -519,132 +559,15 @@ GMO コインの Public WebSocket API には、リクエスト頻度に関する
 
 collector では、以下の対策を実装しています：
 
-#### 1. 接続確立後の待機時間
+**接続確立後の待機時間**
 
-```typescript
-// GmoAdapter.ts
-private readonly CONNECTION_DELAY = 500; // 接続確立後の待機時間（ミリ秒）
-
-async connect(): Promise<void> {
-  // WebSocket 接続を確立
-  this.connection = await this.webSocketClient.connect(this.wsUrl);
-
-  // 接続確立後、500ms 待機してから購読リクエストを送信
-  await new Promise((resolve) => setTimeout(resolve, this.CONNECTION_DELAY));
-  await this.webSocketClient.subscribe(this.connection, this.symbol);
-}
-```
-
-#### 2. 購読リクエスト間の間隔
-
-```typescript
-// GmoWebSocketClient.ts
-private readonly SUBSCRIPTION_INTERVAL = 1000; // 1秒
-
-async subscribe(connection: WebSocketConnection, symbol: string): Promise<void> {
-  const channels: Array<'ticker' | 'orderbooks' | 'trades'> = ['ticker', 'orderbooks', 'trades'];
-  
-  for (let i = 0; i < channels.length; i++) {
-    const channel = channels[i];
-    connection.send(JSON.stringify(command));
-    
-    // 最後のリクエスト以外は 1秒間隔で待機
-    if (i < channels.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, this.SUBSCRIPTION_INTERVAL));
-    }
-  }
-}
-```
-
-**現在のタイミング**:
 1. WebSocket 接続確立
-2. **500ms 待機** (`CONNECTION_DELAY`)
+2. **1000ms**（1秒） (`CONNECTION_DELAY`)
 3. ticker チャンネル購読
-4. **1秒待機** (`SUBSCRIPTION_INTERVAL`)
+4. **2000ms**（2秒） (`SUBSCRIPTION_INTERVAL`)
 5. orderbooks チャンネル購読
-6. **1秒待機** (`SUBSCRIPTION_INTERVAL`)
+6. **2000ms**（2秒） (`SUBSCRIPTION_INTERVAL`)
 7. trades チャンネル購読
-
-**合計時間**: 約 2.5 秒（接続確立後）
-
-### ERR-5003 エラーへの対策
-
-ログで `ERR-5003 Request too many.` エラーが発生した場合、以下の対策を検討してください：
-
-#### 対策案 1: 購読間隔の延長（推奨）
-
-`GmoWebSocketClient.SUBSCRIPTION_INTERVAL` を 1秒から 2秒に延長：
-
-```typescript
-// GmoWebSocketClient.ts
-private readonly SUBSCRIPTION_INTERVAL = 2000; // 2秒に延長
-```
-
-**効果**: 購読リクエスト間の間隔が長くなり、レート制限に達しにくくなります。
-
-#### 対策案 2: 接続待機時間の延長
-
-`GmoAdapter.CONNECTION_DELAY` を 500ms から 1秒に延長：
-
-```typescript
-// GmoAdapter.ts
-private readonly CONNECTION_DELAY = 1000; // 1秒に延長
-```
-
-**効果**: 接続確立直後の購読リクエスト送信を遅らせ、レート制限を回避します。
-
-#### 対策案 3: 環境変数による設定
-
-設定値を環境変数で制御可能にする：
-
-```typescript
-// GmoAdapter.ts
-private readonly CONNECTION_DELAY = Number.parseInt(
-  process.env.GMO_CONNECTION_DELAY ?? '500',
-  10
-);
-
-// GmoWebSocketClient.ts
-private readonly SUBSCRIPTION_INTERVAL = Number.parseInt(
-  process.env.GMO_SUBSCRIPTION_INTERVAL ?? '1000',
-  10
-);
-```
-
-**効果**: 環境に応じて柔軟に調整可能になります。
-
-#### 対策案 4: エラー発生時の自動調整
-
-ERR-5003 エラーが発生した場合、自動的に間隔を延長する：
-
-```typescript
-// GmoWebSocketClient.ts
-private subscriptionInterval = 1000; // 初期値
-
-async subscribe(connection: WebSocketConnection, symbol: string): Promise<void> {
-  // ... 購読処理 ...
-  
-  // ERR-5003 エラーが発生した場合、間隔を 1.5倍に延長
-  if (errorCode === 'ERR-5003') {
-    this.subscriptionInterval = Math.min(
-      this.subscriptionInterval * 1.5,
-      5000 // 最大 5秒
-    );
-  }
-}
-```
-
-**効果**: 動的にレート制限を回避します。
-
-### 推奨設定値
-
-**現在の設定**（ERR-5003 が発生する場合）:
-- `CONNECTION_DELAY`: 500ms
-- `SUBSCRIPTION_INTERVAL`: 1000ms
-
-**推奨設定**（ERR-5003 を回避）:
-- `CONNECTION_DELAY`: **1000ms**（1秒）
-- `SUBSCRIPTION_INTERVAL`: **2000ms**（2秒）
 
 **合計時間**: 約 5秒（接続確立後）
 
@@ -1045,11 +968,125 @@ Grafana の役割は
   - グラフ、テーブル、ゲージなどで表示
   - リアルタイム更新
 
-npm install を実行して prom-client をインストール
-collector サービスを起動
-curl http://localhost:9090/metrics でメトリクスが取得できることを確認
-Prometheus がメトリクスを収集していることを確認
-すべての TODO が完了しました。
+#### Grafana へのアクセス
+
+**ローカル環境でのアクセス方法**:
+
+1. **Grafana にアクセス**
+   - URL: `http://localhost:3000`
+   - ユーザー名: `admin`
+   - パスワード: `admin`
+
+2. **データソースの確認**
+   - 左メニューから「Configuration」→「Data sources」を選択
+   - 「Prometheus」データソースが自動設定されていることを確認
+   - 「Save & test」で接続確認
+
+3. **ダッシュボードの確認**
+   - 左メニューから「Dashboards」→「Browse」を選択
+   - "Collector Metrics Dashboard" が表示される
+   - クリックして各パネルのメトリクスを確認
+
+#### プロビジョニング設定
+
+Grafana は起動時に自動的にデータソースとダッシュボードを読み込みます。
+
+**データソースのプロビジョニング**:
+- ファイル: `grafana/provisioning/datasources/prometheus.yml`
+- Prometheus データソースを自動設定
+- URL: `http://prometheus:9090`
+
+**ダッシュボードのプロビジョニング**:
+- ファイル: `grafana/provisioning/dashboards/dashboards.yml`
+- ダッシュボード JSON ファイルを自動読み込み
+- パス: `/etc/grafana/provisioning/dashboards`
+- 更新間隔: 10秒
+
+#### Collector Metrics Dashboard
+
+**ダッシュボード構成**:
+
+1. **受信メッセージ数の推移（チャンネル別）**
+   - タイプ: Time series
+   - クエリ: `sum by (channel) (rate(collector_messages_received_total[1m]))`
+   - 説明: WebSocket から受信したメッセージ数をチャンネル（ticker, orderbooks, trades）別に表示
+
+2. **配信メッセージ数の推移（ストリーム別）**
+   - タイプ: Time series
+   - クエリ: `sum by (stream) (rate(collector_messages_published_total[1m]))`
+   - 説明: Redis Stream に配信したメッセージ数をストリーム（md:ticker, md:orderbook, md:trade）別に表示
+
+3. **エラー発生状況**
+   - タイプ: Time series
+   - クエリ: `sum by (error_type) (rate(collector_errors_total[5m]))`
+   - 説明: エラータイプ（api_error, parse_error, publish_error）別のエラー発生率
+
+4. **再接続回数**
+   - タイプ: Stat
+   - クエリ: `collector_reconnects_total`
+   - 説明: 累計再接続回数
+
+5. **総受信メッセージ数**
+   - タイプ: Stat
+   - クエリ: `sum(collector_messages_received_total)`
+   - 説明: 全チャンネルの累計受信メッセージ数
+
+6. **メッセージ処理状況（テーブル）**
+   - タイプ: Table
+   - クエリ: `collector_messages_received_total` と `collector_messages_published_total`
+   - 説明: チャンネル/ストリーム別の累計メッセージ数をテーブル形式で表示
+
+**ダッシュボード設定**:
+- **UID**: `collector-metrics`
+- **タイトル**: "Collector Metrics Dashboard"
+- **リフレッシュ間隔**: 15秒（Prometheus の scrape_interval に合わせる）
+- **デフォルト時間範囲**: 直近1時間
+
+#### よく使用する PromQL クエリ例
+
+**受信メッセージ数の推移（チャンネル別）**:
+```promql
+sum by (channel) (rate(collector_messages_received_total[1m]))
+```
+
+**配信メッセージ数の推移（ストリーム別）**:
+```promql
+sum by (stream) (rate(collector_messages_published_total[1m]))
+```
+
+**エラー発生率**:
+```promql
+sum by (error_type) (rate(collector_errors_total[5m]))
+```
+
+**再接続回数**:
+```promql
+collector_reconnects_total
+```
+
+**チャンネル別の受信数**:
+```promql
+sum by (channel) (collector_messages_received_total)
+```
+
+**ストリーム別の配信数**:
+```promql
+sum by (stream) (collector_messages_published_total)
+```
+
+#### ダッシュボードのカスタマイズ
+
+Grafana のダッシュボードは編集可能です（`allowUiUpdates: true` の設定により）。
+
+**カスタマイズ方法**:
+1. ダッシュボードを開く
+2. 右上の「⚙️」アイコン（設定）をクリック
+3. 「Add panel」で新しいパネルを追加
+4. 既存のパネルを編集する場合は、パネルタイトルをクリック → 「Edit」を選択
+
+**注意**: プロビジョニングされたダッシュボードは、コンテナ再起動時に JSON ファイルの内容で上書きされる可能性があります。永続的な変更を加える場合は、`grafana/provisioning/dashboards/collector-metrics.json` を編集してください。
+
+
 
 ---
 
