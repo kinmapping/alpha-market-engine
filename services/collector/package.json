@@ -32,7 +32,7 @@
     "tsx": "^4.21.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.10",
+    "@biomejs/biome": "^2.3.11",
     "@eslint/js": "^9.39.2",
     "@types/eslint": "^9.6.1",
     "@types/node": "^24.10.4",
